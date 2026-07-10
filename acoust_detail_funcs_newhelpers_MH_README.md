@@ -1,680 +1,299 @@
-# README — Updates Added to acoust_detail_funcs_newhelpers_MH.m
-
+# README — acoust_detail_funcs_newhelpers_MH.m
 
 ## Overview
-This file documents the updates added to the MATLAB script:
-**acoust_detail_funcs_newhelpers_MH.m**
 
-The original analysis pipeline is preserved, and new functionality has been added in a modular way without modifying the core structure.
+MATLAB pipeline for acoustic analysis of paired `.WAV` + `.ITS` files from LENA recordings. The script extracts F0 and related features by talker category (CHN, FAN, MAN) and classifies directional AICM conversational interactions (ADS / CDS).
 
-
----
-
-## The original pipeline (Unchanged):
-
-The script still performs the original steps:
-
-1. Select / define the base directory
-2. Find `.ITS` files recursively
-3. Read each ITS file
-4. Parse the original interval categories
-   - CHN (child)
-   - CHN2FAN (child near female adult)
-   - CHN2MAN (child near male adult)
-   - FAN (female adult near)
-   - MAN (male adult near)
-5. Run F0 extraction using `shrp.m`
-6. Save outputs into `.mat` files
+**Latest update (June 2026):** The v3 interaction classifier from `aicm_interaction_classifier_v3.m` is now integrated as the **default** classifier. Legacy classifiers are retained for comparison.
 
 ---
 
-## What Was Kept Unchanged
-The following parts of the original script were preserved:
-- Main script structure
-- Main `for` loop over ITS files
-- Original functions:
-  - `read_its_file_original`
-  - `parse_intervals_original`
-  - `initialize_outputs_original`
-  - `analyze_category_original`
-  - `analyze_interval_original`
-  - `save_outputs_original`
-- Original F0 extraction using `shrp.m`
-- Original `.mat` output files:
-  - CHN
-  - CHN2FAN
-  - CHN2MAN
-  - FAN
-  - MAN
+## Pipeline Summary
 
-This means the updated script still runs the original analysis exactly as before, while also producing the new interaction outputs.
+1. Select base directory containing ITS files
+2. Find all `.its` files recursively
+3. Parse AICM conversation blocks
+4. Extract speaker intervals (CHN, FAN, MAN, CHN2FAN, CHN2MAN)
+5. **v3:** Extract enriched event table per conversation block
+6. **v3:** Classify directed turn-pair interactions
+7. Compute acoustic features (F0, dBFS, syllables) via `shrp.m`
+8. Save `.mat` and `.csv` outputs
 
 ---
 
-## New Functionality Added
+## What Changed in v3 Integration
 
-A new interaction-based analysis branch was added to the main loop:
+### Problems addressed (vs. legacy classifiers)
 
-- Extract AICM interaction-based speaker events 
-- Directional conversational labels
-- Compute acoustic features for interaction segments
-- Save results as `.mat` and `.csv`
+| Issue | Legacy behavior | v3 behavior |
+|-------|-----------------|-------------|
+| Cross-conversation linking | Events from different AICM blocks merged globally | Classification runs **inside each conversation** |
+| Multi-label inflation | One segment could receive 2+ labels | Turn-pair rows + optional **one primary label per segment** |
+| LENA metadata ignored | Only speaker + timing used | Parses `conversationInfo` turn codes (TIMI, TIMR, TIFI, TIFR, …) |
+| Weak neighbor search | Only immediate table neighbor (i−1 / i+1) | **Nearest prior event** within gap window |
+| Cry / non-speech | All segments included | Filters segments with no speech evidence |
+| Fixed adjacency window | Single `adjacencyWindowSec` | Single `adjacencyWindowSec` (default 5.0 s) |
 
----
-
-## Dual-Version Design (Important)
-
-To keep the code simple and comparable, **two versions are kept** for key functions.
-
-### 1) Interval Analysis
-- `analyze_interval_original` → original indexing (0-based style) 
-- `analyze_interval_original_1based` → corrected MATLAB indexing (recommended)
-
-### 2) Interaction Classification
-- `classify_aicm_interactions` → simple adjacency-based classifier
-- `classify_aicm_interactions_rules` → updated classifier  (New rules)
-  * preserves directionality
-  * applies “no preceding CHN / no following CHN” logic
-
-### How to switch versions
-Manually comment/uncomment in the code:
-
-#### Interaction classifier:
+### Main loop change
 
 ```matlab
-% interactionResults = classify_aicm_interactions(eventTable, adjacencyWindowSec);
-interactionResults = classify_aicm_interactions_rules(eventTable, adjacencyWindowSec);
+interactionParams = default_interaction_params_v3();
+[eventTable, interactionResults, turnPairs] = run_interaction_pipeline_v3(matByLine, interactionParams);
 ```
 
-and:
-
-#### Interval analysis:
+Legacy alternatives remain available (comment/uncomment):
 
 ```matlab
-row = analyze_interval_original(...);
-% row = analyze_interval_original_1based(...);
+% eventTable = extract_aicm_event_table(matByLine);
+% interactionResults = classify_aicm_interactions_rules(eventTable, adjacencyWindowSec);
+% turnPairs = table();
 ```
 
 ---
 
-### New outputs added
-For each ITS/WAV pair, the updated code now also:
-- extracts AICM conversational events into a table
-- classifies directional interaction labels
-- computes acoustic features for those interaction rows
-- saves interaction results in `.mat` and `.csv` format
-- saves the raw AICM event table in `.csv` format
+## Classifier Versions
+
+| Version | Function | Status |
+|---------|----------|--------|
+| **v3 turn-pair** | `run_interaction_pipeline_v3` | **Default (recommended)** |
+| Rules (legacy) | `classify_aicm_interactions_rules` | Kept for comparison |
+| Simple (legacy) | `classify_aicm_interactions` | Kept for comparison |
+
+### How to switch classifiers
+
+In the main loop, comment the v3 call and uncomment the legacy block shown above.
 
 ---
 
-## New Processing Steps
+## v3 Parameters (`default_interaction_params_v3`)
 
-### 1) Event Table Extraction
-```matlab
-eventTable = extract_aicm_event_table(matByLine);
-```
-
-Creates a unified table with:
-
-* `speaker`
-* `startSec`
-* `endSec`
-* `durationSec`
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `adjacencyWindowSec` | 5.0 s | Max gap between end of A and start of B |
+| `minDurationSec` | 0.10 s | Minimum segment duration |
+| `requireSpeechEvidence` | `true` | Require word/utterance counts > 0 |
+| `preferLENATurnCodes` | `true` | Use LENA turn codes as primary evidence |
+| `useAdjacencyFallback` | `true` | Fill gaps where LENA has no code |
+| `applyNoChnBetweenRule` | `true` | Block ADS if CHN sits between two adults |
+| `segmentPrimaryLabelOnly` | `true` | One label per segment in `interactionResults` |
 
 ---
 
-### 2) Interaction Classification
-```matlab
-interactionResults = classify_aicm_interactions(...)
-```
+## Output Tables
 
-or
+### 1. `eventTable` (enriched)
 
-```matlab
-interactionResults = classify_aicm_interactions_rules(...)
-```
+One row per speech segment inside each AICM block.
 
-### Supported Interaction Labels
+| Column | Description |
+|--------|-------------|
+| `speaker` | CHN, FAN, or MAN |
+| `startSec`, `endSec`, `durationSec` | Segment timing (seconds) |
+| `conversationId` | AICM block number from ITS `num="..."` |
+| `eventIndex` | Index within conversation (resets per block) |
+| `segmentRole` | BC (beginning), RC (related), EC (end) |
+| `turnCode` | LENA turn code: TIMI, TIMR, TIFI, TIFR, TIFE, NT, … |
+| `endCode` | FI, FH, etc. |
+| `childUttCnt` | Child utterance count (CHN lines) |
+| `adultWordCnt` | Adult word count (FAN/MAN lines) |
+| `isValidSpeech` | `true` if segment passes duration + speech filters |
+| `sourceLineIndex` | ITS file line index |
 
-* MANtoMAN
-* MANtoFAN
-* FANtoMAN
-* FANtoFAN
-* MANtoCHN
-* CHNtoMAN
-* FANtoCHN
-* CHNtoFAN
+### 2. `turnPairs` (recommended for statistics)
+
+One row per **directed interaction pair** (A → B).
+
+| Column | Description |
+|--------|-------------|
+| `conversationId` | AICM block ID |
+| `fromSpeaker`, `toSpeaker` | Directed pair |
+| `classLabel` | e.g. MANtoCHN, FANtoMAN |
+| `gapSec` | Time between end of A and start of B |
+| `labelSource` | `LENA_target`, `LENA_source`, or `adjacency` |
+| `fromStartSec`, `fromEndSec`, `toStartSec`, `toEndSec` | Timing |
+| `fromEventIndex`, `toEventIndex` | Event indices within conversation |
+| `fromTurnCode`, `toTurnCode` | LENA codes on each side |
+| `speechType` | ADS or CDS |
+
+### 3. `interactionResults` (segment-level, backward compatible)
+
+One row per **target (responder) segment**, with optional primary label only. Compatible with `add_acoustics_to_interaction_table`.
+
+| Column | Description |
+|--------|-------------|
+| `speaker`, `startSec`, `endSec`, `durationSec` | Responder segment |
+| `classLabel` | Directional label |
+| `gapSec`, `labelSource` | v3 metadata |
+| `conversationId`, `eventIndex` | Per-conversation indexing |
+| `speechType` | ADS or CDS |
+| `f0mean`, `f0std`, `f0min`, `f0max`, `f0range` | Added by acoustic step |
+| `dBFS`, `pctUttVx` | Intensity / voicing |
+| `syllableCount`, `syllablesPerSec` | Syllable estimation |
 
 ---
 
+## Supported Interaction Labels
 
-### 3) Acoustic Analysis for Interactions
-```matlab
-interactionResults = add_acoustics_to_interaction_table(...)
-```
-
-Adds:
-
-* `f0mean`
-* `f0std`
-* `f0min`
-* `f0max`
-* `dBFS`
-* `pctUttVx`
+- **ADS:** MANtoMAN, MANtoFAN, FANtoMAN, FANtoFAN
+- **CDS:** MANtoCHN, CHNtoMAN, FANtoCHN, CHNtoFAN
 
 ---
 
-## F0 Trimming (Important)
+## Output Files (per recording)
 
-A small edge trimming is applied:
+### Original (unchanged)
+
+- `*_CHN.mat`, `*_CHN2FAN.mat`, `*_CHN2MAN.mat`, `*_FAN.mat`, `*_MAN.mat`
+
+### Interaction / v3 (new or updated)
+
+| File | Contents |
+|------|----------|
+| `*_AICM_INTERACTIONS.mat` | `interactionResults`, `eventTable`, `turnPairs` |
+| `*_AICM_EVENTS.csv` | Enriched event table |
+| `*_AICM_TURN_PAIRS.csv` | Turn-pair table (v3) |
+| `*_AICM_INTERACTIONS_All_Segments.csv` | All speaker segments with optional `classLabel` and acoustics |
+| `*_AICM_INTERACTIONS.csv` | Classified segments only (`classLabel` subset of All_Segments) |
+| `*_AICM_INTERACTIONS_Events.csv` | Unified raw events + classified interactions |
+| `*_speechType_label_summary.csv` | ADS/CDS and label counts with percentages |
+| `*_classifier_compare.csv` | v3 vs legacy label counts |
+| `*_counts.png`, `*_ads_cds.png`, `*_f0mean.png`, `*_dbfs.png` | Evaluation plots |
+| `*_classifier_compare.png` | Classifier comparison bar chart |
+
+---
+
+## v3 Classification Algorithm
+
+Per AICM conversation block:
+
+1. Filter to `isValidSpeech == true`
+2. For each event B (j = 2…n):
+   - Find nearest prior event A within `adjacencyWindowSec`
+   - Assign label (priority: LENA code on B → LENA code on A → adjacency)
+   - Apply no-CHN-between rule for ADS labels
+3. Deduplicate pairs; keep smallest `gapSec` when tied
+4. Convert to segment table (primary label per segment if enabled)
+
+### LENA turn code mapping
+
+| Code | Meaning | Typical label |
+|------|---------|---------------|
+| TIMI | Male turn initiation | MAN → * |
+| TIMR | Male turn response (child) | MANtoCHN |
+| TIFI / TIFE | Female turn initiation / engagement | FAN → * |
+| TIFR | Female turn response (child) | FANtoCHN |
+| NT | No turn | Falls back to adjacency |
+
+---
+
+## New v3 Functions
+
+| Function | Purpose |
+|----------|---------|
+| `run_interaction_pipeline_v3` | Main v3 orchestrator |
+| `default_interaction_params_v3` | Parameter struct |
+| `extract_aicm_event_table_v3` | Per-conversation event extraction |
+| `parse_speaker_segment_line_v3` | Parse segment + LENA metadata |
+| `is_valid_speech_segment_v3` | Speech validity filter |
+| `classify_aicm_turn_pairs_v3` | Turn-pair classifier |
+| `find_turn_pairs_in_block_v3` | Pair generation within one block |
+| `find_nearest_prior_event_v3` | Backward nearest-neighbor search |
+| `assign_pair_label_v3` | Label assignment with LENA priority |
+| `map_turn_code_to_label_v3` | LENA code → directional label |
+| `turn_pairs_to_segment_table_v3` | Segment-level backward-compatible table |
+| `compare_classifiers_light` | v3 vs legacy comparison |
+
+### Legacy functions (preserved)
+
+- `extract_aicm_event_table`
+- `classify_aicm_interactions`
+- `classify_aicm_interactions_rules`
+- `build_conversation_block`, `parse_speaker_segments_from_line`
+- `build_directional_label`, `is_supported_direction`
+
+---
+
+## Acoustic Analysis
+
+### Interval analysis (dual version)
+
+- `analyze_interval_original_1based` — corrected MATLAB indexing (**default** in pipeline)
+- `analyze_interval_original` — legacy 0-based indexing (VanDam 2013)
+
+Switch inside `analyze_category_original` and `add_acoustics_to_interaction_table`.
+
+### F0 trimming
 
 ```matlab
 trimEdgeFrames = 2;
 ```
-A small number of F0 frames are removed from:
 
-* beginning of utterance
-* end of utterance
+Removes edge voiced F0 frames before computing statistics (reduces onset/offset pitch errors).
 
-This removes the first and last voiced F0 values before computing statistics.
+### F0 search ranges (`choose_f0_range`)
 
-### Reason:
-- Start of utterance → unstable pitch detection
-- End of utterance → noise / fading
+| Speaker | Range (Hz) |
+|---------|------------|
+| CHN | 100–600 |
+| FAN | 100–600 |
+| MAN | 50–300 |
 
-### Effect:
+### Syllable estimation
 
-This improves:
-
-* f0mean
-* f0std
-* f0min
-* f0max
-
----
-
-## Output Files
-
-For each recording:
-
-### Original outputs:
-- *_CHN.mat
-- *_CHN2FAN.mat
-- *_CHN2MAN.mat
-- *_FAN.mat
-- *_MAN.mat
-
-### New outputs:
-- *_AICM_INTERACTIONS.mat
-- *_AICM_INTERACTIONS.csv
-- *_AICM_EVENTS.csv
-
----
-
-### File meanings:
-
-* **INTERACTIONS.mat** → MATLAB table with labels + acoustics
-* **INTERACTIONS.csv** → spreadsheet version
-* **AICM_EVENTS.csv** → raw event table
-
----
-
-## New Helper Functions
-
-* `extract_aicm_event_table`
-* `build_conversation_block`
-* `parse_speaker_segments_from_line`
-* `classify_aicm_interactions`
-* `classify_aicm_interactions_rules`
-* `add_acoustics_to_interaction_table`
-* `choose_f0_range`
-* `is_supported_direction`
-* `build_directional_label`
-
----
-
-## Current Limitations
-
-* Syllable estimation not implemented yet
-* Multi-label tracking can be improved
-* Rule-based classifier can be further refined
+`estimate_syllables` — bandpass (300–4000 Hz) + Hilbert envelope + peak detection (De Jong & Wempe style).
 
 ---
 
 ## Design Philosophy
 
-* Preserve original code
-* Add new functionality as separate modules
-* Allow easy comparison between methods
-* Keep main loop simple and readable
+- Preserve original F0 pipeline and `.mat` outputs
+- Add v3 interaction analysis as a modular branch
+- Keep legacy classifiers for validation and comparison
+- Default to v3 for improved accuracy and LENA metadata use
+
+---
+
+## Quick Start
+
+```matlab
+% 1. Set data folder
+baseDir = 'D:\path\to\rawData';
+
+% 2. Run script (processes ITS files in loop)
+% Default: v3 classifier via run_interaction_pipeline_v3
+
+% 3. Inspect outputs in results_YYYYMMDD/
+%    - *_AICM_TURN_PAIRS.csv  → primary interaction statistics
+%    - *_AICM_EVENTS.csv       → raw enriched events
+%    - *_classifier_compare.csv → v3 vs legacy counts
+```
+
+### Tune v3 parameters
+
+```matlab
+interactionParams = default_interaction_params_v3();
+interactionParams.adjacencyWindowSec = 6.0;
+[eventTable, interactionResults, turnPairs] = run_interaction_pipeline_v3(matByLine, interactionParams);
+```
+
+---
+
+## Migration Notes
+
+- **Standalone file:** `aicm_interaction_classifier_v3.m` remains available for isolated testing; its logic is now embedded in `acoust_detail_funcs_newhelpers_MH.m`.
+- **Column rename:** v3 event table uses `sourceLineIndex` (legacy used `sourceIndex`). `create_unified_detail_table` handles both.
+- **Comparison:** `compare_both_classifiers_light` was replaced by `compare_classifiers_light` (adds v3 turn-pair counts).
 
 ---
 
 ## Summary
 
-This updated script:
-
-* preserves the original analysis pipeline
-* adds interaction-based conversational analysis
-* improves acoustic feature extraction
-* remains modular, clear, and maintainable
-
-
-## New Functions Added
-
-### 1) `extract_aicm_event_table(matByLine)`
-Purpose:
-- scans AICM conversation blocks
-- extracts speaker events for `CHN`, `FAN`, and `MAN`
-- returns a unified table of conversational events
-
-Output columns:
-- `speaker`
-- `startSec`
-- `endSec`
-- `durationSec`
-- `sourceIndex`
-
-This provides a cleaner event representation than using only separate interval matrices.
-
-**Notes:**
-
-* Only AICM conversations are processed
-* Output is sorted by time for later interaction analysis
-
----
-
-### 2) `build_conversation_block(matByLine, startIndex)`
-Purpose:
-- builds one AICM conversation block from the ITS text
-- collects all lines until `</Conversation>`
-
-This was added to keep the event extraction code cleaner and easier to maintain.
-
-**Behavior:**
-
-* Starts from a line containing `type="AICM"`
-* Stops at `</Conversation>`
-
-**Notes:**
-
-* Keeps parsing logic clean and modular
-
----
-
-### 3) `parse_speaker_segments_from_line(kLine)`
-Purpose:
-- extracts one or more speaker segments from a single ITS line
-- supports:
-  - `CHN`
-  - `FAN`
-  - `MAN`
-
-Notes:
-- `CHN` lines can contain multiple utterances
-- `FAN` and `MAN` lines typically provide one interval via `startTime` / `endTime`
-
----
-
-### 4) `classify_aicm_interactions(interactionEvents, adjacencyWindowSec)`
-Purpose:
-- sorts the event table in time order
-- checks adjacent events
-- assigns directional labels when the time gap is within the allowed window
-
-Current adjacency rule:
-- if the next event starts within `2` seconds of the current event ending, a directional label may be created
-
-Current supported labels:
-- `MANtoMAN`
-- `MANtoFAN`
-- `FANtoMAN`
-- `FANtoFAN`
-- `MANtoCHN`
-- `CHNtoMAN`
-- `FANtoCHN`
-- `CHNtoFAN`
-
-Important note:
-- this version uses a practical adjacency-based implementation
-- stricter rules such as “no preceding CHN” or “no following CHN” were not yet enforced separately
-- these rules can be added later inside this function if needed
-* A segment can receive multiple labels
-* Stores timing gaps (`prevGapSec`, `nextGapSec`)
-* This is the **baseline classifier**
-
----
-
-### 5) `classify_aicm_interactions_rules(eventTable, adjacencyWindowSec)`
-
-Purpose:
-
-* Updated classifier implementing stricter interaction rules
-
-Improvements:
-
-* Preserves directionality
-* Applies:
-
-  * "no preceding CHN"
-  * "no following CHN"
-* Separates adult-directed and child-directed interactions
-
-**Notes:**
-
-* This is the **recommended classifier**
-* More consistent with project requirements
-
----
-
-### 6) `is_supported_direction(fromSpeaker, toSpeaker)`
-Purpose:
-- Validate that a generated interaction label is allowed
-- allows only the directional combinations required by the project
-- prevents unsupported speaker pair labels from being stored
-
-**Supported labels:**
-
-* MANtoMAN, MANtoFAN, FANtoMAN, FANtoFAN
-* MANtoCHN, CHNtoMAN, FANtoCHN, CHNtoFAN
-
----
-
-### 7) `build_directional_label(fromSpeaker, toSpeaker)`
-Purpose:
-- converts two adjacent speakers into a class label string
-
-Examples:
-- `MAN`, `CHN` → `MANtoCHN`
-- `FAN`, `MAN` → `FANtoMAN`
-
----
-
-### 8) `add_acoustics_to_interaction_table(...)`
-Purpose:
-- reads the WAV segment corresponding to each interaction row
-- computes added acoustic features
-- appends those measurements to the interaction table
-
-Features added:
-- `f0mean`
-- `f0std`
-- `f0min`
-- `f0max`
-- `dBFS`
-- `pctUttVx`
-
-Notes:
-- Uses `shrp.m` for pitch extraction
-- a small edge trim is applied before summary statistics
-- Applies F0 edge trimming (`trimEdgeFrames`)
-- Uses speaker-specific F0 ranges
-
----
-
-### 9) `choose_f0_range(speaker)`
-Purpose:
-- selects the appropriate F0 search range by talker
-
-Current ranges:
-- `CHN` → `[200 600]`
-- `FAN` → `[120 400]`
-- `MAN` → `[50 250]`
-
-This keeps the same talker-specific logic already used in the original script.
-
----
-
-### 10) `analyze_interval_original(...)`
-
-**Purpose:**
-
-* Original interval-based acoustic analysis
-
-**Characteristics:**
-
-* Uses direct sample indexing (0-based style)
-* May produce indexing issues near start of audio
-
-**Notes:**
-
-* Kept for comparison with updated version
-
----
-
-### 11) `analyze_interval_original_1based(...)`
-
-**Purpose:**
-
-* Updated interval analysis using correct MATLAB indexing
-
-**Improvements:**
-
-* Uses 1-based indexing (MATLAB standard)
-* Prevents invalid reads
-* Uses `audioinfo` for safe bounds
-* Applies F0 trimming
-
-**Notes:**
-
-* Recommended version for stable analysis
-
----
-
-### 12) `analyze_category_original(...)`
-
-**Purpose:**
-
-* Apply interval analysis across all segments in a category
-
-**Categories:**
-
-* C2F, C2M, C, F, M
-
-**Notes:**
-
-* Calls interval analysis function internally
-* Supports switching between original and updated versions
-
----
-
-### 13) `save_outputs_original(...)`
-
-**Purpose:**
-
-* Save all results to `.mat` and `.csv` files
-
-**Outputs:**
-
-* Original category results
-* Interaction results
-* Event table
-
----
-
-### 14) `read_its_file_original(...)`
-
-**Purpose:**
-
-* Read ITS file line-by-line into a structured format
-
-**Notes:**
-
-* Extracts subject name from filename
-* Stores file contents in `matByLine`
-
----
-
-### 15) `parse_intervals_original(...)`
-
-**Purpose:**
-
-* Extract original interval categories from ITS file
-
-**Outputs:**
-
-* CHN, CHN2FAN, CHN2MAN, FAN, MAN
-
-**Notes:**
-
-* Uses neighbor-based logic for CHN2FAN / CHN2MAN
-* Only processes AICM conversations
-
-
-
-
-
-## New Acoustic Measurements Added
-
-The interaction table now includes additional acoustic features beyond the original output.
-
-### F0 Features
-
-Added:
-
-* `f0mean`
-* `f0std`
-* `f0min`
-* `f0max`
-
----
-
-### F0 Trimming
-
-A simple edge trimming rule is applied:
-
-```matlab
-trimEdgeFrames = 2;
-```
-
-This removes a small number of voiced F0 values from the beginning and end of each segment before computing summary statistics.
-
-**Reason:**
-
-* Beginning of utterance → unstable pitch detection
-* End of utterance → noise or fading
-
-This improves the reliability of:
-
-* f0mean
-* f0std
-* f0min
-* f0max
-
----
-
-### Intensity
-
-Added:
-
-* `dBFS`
-
-This is computed using RMS amplitude:
-
-* Provides a basic measure of signal intensity
-* Expressed in digital full-scale (dBFS)
-
----
-
-## Files Now Produced
-
-In addition to the original `.mat` files, the script now produces:
-
-### New files per recording
-
-* `*_AICM_INTERACTIONS.mat`
-* `*_AICM_INTERACTIONS.csv`
-* `*_AICM_EVENTS.csv`
-
----
-
-### Meaning of these files
-
-* **AICM_INTERACTIONS.mat** → MATLAB table with interaction labels and acoustic features
-* **AICM_INTERACTIONS.csv** → same results in spreadsheet format
-* **AICM_EVENTS.csv** → raw event table before classification
-
----
-
-## Current Limitations
-
-### 1) Syllables per utterance
-
-Not implemented yet.
-
-Would require:
-
-* a MATLAB syllable estimation method
-* or external speech processing tools
-
----
-
-### 2) Interaction classification rules
-
-Two versions are implemented:
-
-* `classify_aicm_interactions` → simple adjacency
-* `classify_aicm_interactions_rules` → includes stricter rules
-
-The updated version applies:
-
-* “no preceding CHN”
-* “no following CHN”
-
----
-
-### 3) Multi-label membership
-
-* A segment may belong to multiple interaction labels
-* This is handled per interaction row
-* Further refinement is possible if needed
-
----
-
-## Why This Update Is Safe
-
-This update preserves the original script structure:
-
-* Original functions are unchanged
-* Original outputs are preserved
-* New functionality is added as separate helper functions
-* The main loop is extended, not modified
-
-This allows:
-
-* easy comparison with the original script
-* safe integration of new features
-
----
-
-## Suggested Comment for Main Loop
-
-```matlab
-% ===== New directional AICM interaction analysis branch =====
-% Adds:
-% 1) AICM event extraction
-% 2) directional interaction classification
-% 3) acoustic feature extraction for interactions
-% 4) CSV and MAT output
-```
-
----
-
-## New Function Calls in Main Loop
-
-The following steps are added in the main loop:
-
-```matlab
-adjacencyWindowSec = 2;
-trimEdgeFrames = 2;
-
-eventTable = extract_aicm_event_table(matByLine);
-interactionResults = classify_aicm_interactions(eventTable, adjacencyWindowSec);
-% interactionResults = classify_aicm_interactions_rules(eventTable, adjacencyWindowSec);
-
-interactionResults = add_acoustics_to_interaction_table( ...
-    interactionResults, fname, rate, frame_length, TimeStep, ...
-    SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames);
-```
-
-These additions extend the pipeline without changing its original architecture.
+| Aspect | Before v3 | After v3 |
+|--------|-----------|----------|
+| Default classifier | `classify_aicm_interactions_rules` | `run_interaction_pipeline_v3` |
+| Conversation boundaries | Global event table | Per-block `conversationId` |
+| LENA turn codes | Ignored | Primary classification evidence |
+| Multi-label segments | Common | One primary label (configurable) |
+| Neighbor search | i−1 / i+1 only | Nearest prior within window |
+| New output | — | `turnPairs`, `*_AICM_TURN_PAIRS.csv` |
+| Pair metadata | None | `gapSec`, `labelSource` |

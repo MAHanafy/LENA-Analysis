@@ -1,0 +1,7 @@
+*.its
+*.wav
+
+# Generated analysis outputs and MATLAB temporary files
+results_*/
+debug.log
+*.asv
