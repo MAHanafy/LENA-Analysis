@@ -1,4 +1,4 @@
-function [segmentTable, interactionResults, turnPairs] = classify_interactions(matByLine, params)
+function [segmentTable, interactionResults, turnPairs, diagnostic] = classify_interactions(matByLine, params)
 % RUN_INTERACTION_PIPELINE_V3
 % Orchestrates v3 extraction, turn-pair classification, and segment-level output.
 
@@ -9,6 +9,67 @@ function [segmentTable, interactionResults, turnPairs] = classify_interactions(m
     segmentTable = extract_aicm_segment_table_v3(matByLine, params);
     turnPairs = classify_aicm_turn_pairs_v3(segmentTable, params);
     interactionResults = turn_pairs_to_segment_table_v3(turnPairs, segmentTable, params);
+    diagnostic = build_empty_session_diagnostic_v3( ...
+        matByLine, params, segmentTable, turnPairs, interactionResults);
+end
+
+function diagnostic = build_empty_session_diagnostic_v3(matByLine, params, segmentTable, turnPairs, interactionResults)
+    aicmConversationCount = 0;
+    candidateSegmentCount = 0;
+    rejectedNoImmediateNeighborCount = 0;
+
+    requireLineNeighbor = isfield(params, 'requireAicmLineNeighbor') && ...
+        logical(params.requireAicmLineNeighbor);
+
+    for k = 1:length(matByLine)
+        if ~contains(matByLine(k).text, 'type="AICM"')
+            continue;
+        end
+
+        aicmConversationCount = aicmConversationCount + 1;
+        cBlock = build_conversation_block(matByLine, k);
+        for jj = 1:length(cBlock)
+            segInfo = parse_speaker_segment_line_v3(cBlock(jj).text);
+            if isempty(segInfo.speaker)
+                continue;
+            end
+
+            utteranceCount = numel(segInfo.starts);
+            candidateSegmentCount = candidateSegmentCount + utteranceCount;
+            if requireLineNeighbor && ~has_aicm_line_neighbor_v3(cBlock, jj)
+                rejectedNoImmediateNeighborCount = ...
+                    rejectedNoImmediateNeighborCount + utteranceCount;
+            end
+        end
+    end
+
+    acceptedSegmentCount = height(segmentTable);
+    validSpeechSegmentCount = sum(segmentTable.isValidSpeech);
+    interactionPairCount = height(turnPairs);
+    interactionRowCount = height(interactionResults);
+
+    if interactionRowCount > 0
+        reason = "Interactions produced";
+    elseif aicmConversationCount == 0
+        reason = "No AICM conversations were present in the ITS file";
+    elseif candidateSegmentCount == 0
+        reason = "AICM conversations contained no CHN, FAN, or MAN speech segments";
+    elseif acceptedSegmentCount == 0 && rejectedNoImmediateNeighborCount > 0
+        reason = "All candidate segments were rejected because no CHN, FAN, or MAN segment was immediately adjacent";
+    elseif validSpeechSegmentCount == 0
+        reason = "Candidate segments were found, but none met the configured speech-evidence and duration requirements";
+    elseif interactionPairCount == 0
+        reason = "Valid segments were found, but no supported interaction pair met the turn-code or timing rules";
+    else
+        reason = "Interaction pairs were found, but no segment-level interaction rows were produced";
+    end
+
+    diagnostic = table(aicmConversationCount, candidateSegmentCount, ...
+        acceptedSegmentCount, rejectedNoImmediateNeighborCount, ...
+        validSpeechSegmentCount, interactionPairCount, interactionRowCount, reason, ...
+        'VariableNames', {'aicmConversationCount','candidateSegmentCount', ...
+        'acceptedSegmentCount','rejectedNoImmediateNeighborCount', ...
+        'validSpeechSegmentCount','interactionPairCount','interactionRowCount','reason'});
 end
 
 function params = default_interaction_params_v3()

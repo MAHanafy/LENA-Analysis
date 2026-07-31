@@ -62,6 +62,7 @@ Responsibilities are intentionally broad so the project remains compact:
 - `classify_interactions.m`: unchanged v3 turn-pair classifier
 - `analyze_acoustics.m`: F0, semitone F0 range, dBFS, estimated dBSPL, and syllable calculations
 - `save_results.m`: metadata columns, CSV/MAT export, folder mirroring, and subject merge
+- Empty sessions produce `*_EMPTY_SESSION_DIAGNOSTIC.csv` with candidate, rejection, and interaction counts plus the reason no interactions were exported.
 - `create_plots.m`: evaluation and classifier-comparison plots
 - `legacy/acoust_detail_funcs_original.m`: frozen pre-refactor implementation for reference
 

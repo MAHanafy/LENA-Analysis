@@ -15,7 +15,7 @@ end
 save_outputs_original(itsResultsFolder, result.subjectName, result.fname, ...
     result.dataF0c, result.dataF0c2f, result.dataF0c2m, result.dataF0f, ...
     result.dataF0m, result.interactionResults, result.segmentTable, ...
-    result.turnPairs, cfg.nameCorrespondencesFile);
+    result.turnPairs, result.emptySessionDiagnostic, cfg.nameCorrespondencesFile);
 
 try
     merge_subject_all_segments(subjectResultsFolder, result.subjectName);
@@ -42,12 +42,15 @@ function baseName = build_output_base_name(subjName, fname)
 end
 
 
-function save_outputs_original(resultsFolder, subjName, fname, dataF0c, dataF0c2f, dataF0c2m, dataF0f, dataF0m, interactionResults, segmentTable, turnPairs, nameCorrespondencesFile)
+function save_outputs_original(resultsFolder, subjName, fname, dataF0c, dataF0c2f, dataF0c2m, dataF0f, dataF0m, interactionResults, segmentTable, turnPairs, emptySessionDiagnostic, nameCorrespondencesFile)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     if nargin < 11
         turnPairs = table();
     end
     if nargin < 12
+        emptySessionDiagnostic = table();
+    end
+    if nargin < 13
         nameCorrespondencesFile = '';
     end
     % SAVE_OUTPUTS_ORIGINAL
@@ -79,7 +82,13 @@ function save_outputs_original(resultsFolder, subjName, fname, dataF0c, dataF0c2
     save([outputBaseName '_CHN2MAN'], 'dataF0c2m');
     save([outputBaseName '_FAN'], 'dataF0f');
     save([outputBaseName '_MAN'], 'dataF0m');
-    save([outputBaseName '_AICM_INTERACTIONS'], 'interactionResults', 'segmentTable', 'turnPairs');
+    save([outputBaseName '_AICM_INTERACTIONS'], 'interactionResults', 'segmentTable', 'turnPairs', 'emptySessionDiagnostic');
+
+    if isempty(interactionResults) && ~isempty(emptySessionDiagnostic)
+        diagnosticTable = addvars(emptySessionDiagnostic, string(outputBaseName), ...
+            'Before', 1, 'NewVariableNames', 'recordingName');
+        writetable(diagnosticTable, [outputBaseName '_EMPTY_SESSION_DIAGNOSTIC.csv']);
+    end
 
     allSegmentsCore = create_all_segments_table(segmentTable, interactionResults, turnPairs);
     allSegmentsFileName = [outputBaseName '_AICM_INTERACTIONS_All_Segments'];

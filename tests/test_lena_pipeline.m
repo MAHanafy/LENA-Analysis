@@ -108,6 +108,29 @@ verifyTrue(testCase, all(ismember( ...
     turnPairs.Properties.VariableNames)));
 end
 
+function testEmptySessionDiagnosticExplainsNeighborRejection(testCase)
+cfg = lena.config();
+lines = {
+    '<Conversation num="175" type="AICM">'
+    '<Segment spkr="MAN" maleAdultWordCnt="3" startTime="PT1.0S" endTime="PT2.0S" />'
+    '<Segment spkr="OLF" startTime="PT2.0S" endTime="PT3.0S" />'
+    '<Segment spkr="CHN" childUttCnt="1" startUtt1="PT3.0S" endUtt1="PT4.0S" startTime="PT3.0S" endTime="PT4.0S" />'
+    '</Conversation>'
+    };
+matByLine = struct('text', lines);
+
+[segmentTable, interactionResults, turnPairs, diagnostic] = ...
+    lena.classify_interactions(matByLine, cfg.interaction);
+
+verifyEmpty(testCase, segmentTable);
+verifyEmpty(testCase, interactionResults);
+verifyEmpty(testCase, turnPairs);
+verifyEqual(testCase, diagnostic.aicmConversationCount, 1);
+verifyEqual(testCase, diagnostic.candidateSegmentCount, 2);
+verifyEqual(testCase, diagnostic.rejectedNoImmediateNeighborCount, 2);
+verifySubstring(testCase, diagnostic.reason, "immediately adjacent");
+end
+
 function testHistoricalEntryPointIsRetained(testCase)
 compatibilityFile = fullfile(testCase.TestData.repoRoot, ...
     'acoust_detail_funcs_newhelpers_MH.m');

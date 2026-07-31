@@ -8,7 +8,7 @@ disp(['Working on file: ' recording.name ' in directory: ' recording.folder]);
 
 [subjName, matByLine] = read_its_file_original(recording.name);
 [tCHN, tCHN2FAN, tCHN2MAN, tFAN, tMAN] = parse_intervals_original(matByLine);
-[segmentTable, interactionResults, turnPairs] = ...
+[segmentTable, interactionResults, turnPairs, emptySessionDiagnostic] = ...
     lena.classify_interactions(matByLine, cfg.interaction);
 clear matByLine;
 
@@ -29,6 +29,7 @@ result.tMAN = tMAN;
 result.segmentTable = segmentTable;
 result.interactionResults = interactionResults;
 result.turnPairs = turnPairs;
+result.emptySessionDiagnostic = emptySessionDiagnostic;
 
 result = lena.analyze_acoustics(result, cfg);
 end
