@@ -233,16 +233,7 @@ function merge_subject_all_segments(subjectFolder, subjectName)
 
     for f = 1:numel(csvFiles)
         csvPath = fullfile(csvFiles(f).folder, csvFiles(f).name);
-        currentTable = readtable(csvPath, 'VariableNamingRule', 'preserve');
-        if ismember('Date', currentTable.Properties.VariableNames) && ~isdatetime(currentTable.('Date'))
-            dateText = string(currentTable.('Date'));
-            parsedDates = NaT(size(dateText));
-            isoMask = contains(dateText, '-');
-            parsedDates(isoMask) = datetime(dateText(isoMask), 'InputFormat', 'yyyy-MM-dd');
-            parsedDates(~isoMask) = datetime(dateText(~isoMask), 'InputFormat', 'M/d/yyyy');
-            parsedDates.Format = 'M/d/yyyy';
-            currentTable.('Date') = parsedDates;
-        end
+        currentTable = lena.read_all_segments_csv(csvPath);
         if isempty(mergedTable)
             mergedTable = currentTable;
         else

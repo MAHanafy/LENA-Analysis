@@ -125,6 +125,22 @@ verifyTrue(testCase, isnan(lena.f0_range_semitones(0, 200)));
 verifyEqual(testCase, lena.dbfs_to_dbspl([-97 -20 -Inf]), [0 77 -Inf]);
 end
 
+function testAllSegmentsDateImportIsMonthFirst(testCase)
+fixture = testCase.applyFixture( ...
+    matlab.unittest.fixtures.TemporaryFolderFixture);
+csvPath = fullfile(fixture.Folder, 'segments.csv');
+fileId = fopen(csvPath, 'w');
+cleanup = onCleanup(@() fclose(fileId));
+fprintf(fileId, 'file name,Date,conversationId\n');
+fprintf(fileId, 'session1,01/02/2011,1\n');
+clear cleanup
+
+resultTable = lena.read_all_segments_csv(csvPath);
+
+verifyTrue(testCase, isdatetime(resultTable.Date));
+verifyEqual(testCase, resultTable.Date, datetime(2011, 1, 2, 'Format', 'M/d/yyyy'));
+end
+
 function createEmptyFile(filePath)
 fileId = fopen(filePath, 'w');
 if fileId < 0
