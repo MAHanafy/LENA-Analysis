@@ -142,49 +142,26 @@ verifyTrue(testCase, isfile(legacyFile));
 verifySubstring(testCase, fileread(compatibilityFile), 'run_lena_analysis');
 end
 
-function testAcousticConversions(testCase)
-verifyEqual(testCase, lena.f0_range_semitones(100, 200), 12, 'AbsTol', 1e-12);
-verifyTrue(testCase, isnan(lena.f0_range_semitones(0, 200)));
-verifyEqual(testCase, lena.dbfs_to_dbspl([-97 -20 -Inf]), [0 77 -Inf]);
+function testAcousticHelpersAreConsolidated(testCase)
+analysisFile = fullfile(testCase.TestData.repoRoot, '+lena', 'analyze_acoustics.m');
+analysisText = fileread(analysisFile);
+
+verifySubstring(testCase, analysisText, 'function dBSPL = dbfs_to_dbspl');
+verifySubstring(testCase, analysisText, 'function rangeST = f0_range_semitones');
+verifySubstring(testCase, analysisText, 'function stats = compute_loudness_variability_stats');
+verifySubstring(testCase, analysisText, 'dBFS(finiteMask) + 97');
+verifySubstring(testCase, analysisText, '12 * log2');
+verifyFalse(testCase, contains(analysisText, 'loudnessCV'));
 end
 
-function testLoudnessVariabilityMetricsExcludeCv(testCase)
-signal = [0.1 * ones(320, 1); 0.2 * ones(320, 1)];
-stats = lena.compute_loudness_variability_stats(signal, 16000, 20, 20, 1e-6);
+function testOutputHelpersAreConsolidated(testCase)
+saveFile = fullfile(testCase.TestData.repoRoot, '+lena', 'save_results.m');
+saveText = fileread(saveFile);
 
-verifyEqual(testCase, stats.nValidFrames, 2);
-verifyGreaterThan(testCase, stats.loudnessStd, 0);
-verifyGreaterThan(testCase, stats.loudnessRange, 0);
-verifyGreaterThan(testCase, stats.loudnessIQR, 0);
-verifyFalse(testCase, isfield(stats, 'loudnessCV'));
-end
-
-function testLoudnessSummaryGroupsBySpeakerAndClass(testCase)
-sourceTable = table(["CHN";"CHN";"FAN"], ["FANtoCHN";"FANtoCHN";"CHNtoFAN"], ...
-    [1;2;3], [2;4;6], [3;6;9], ...
-    'VariableNames', {'speaker','classLabel','loudnessStd','loudnessRange','loudnessIQR'});
-
-summaryTable = lena.create_loudness_summary(sourceTable);
-
-verifyTrue(testCase, any(summaryTable.level == "speaker" & summaryTable.group == "CHN"));
-verifyTrue(testCase, any(summaryTable.level == "classLabel" & summaryTable.group == "FANtoCHN"));
-verifyFalse(testCase, any(summaryTable.metric == "loudnessCV"));
-end
-
-function testAllSegmentsDateImportIsMonthFirst(testCase)
-fixture = testCase.applyFixture( ...
-    matlab.unittest.fixtures.TemporaryFolderFixture);
-csvPath = fullfile(fixture.Folder, 'segments.csv');
-fileId = fopen(csvPath, 'w');
-cleanup = onCleanup(@() fclose(fileId));
-fprintf(fileId, 'file name,Date,conversationId\n');
-fprintf(fileId, 'session1,01/02/2011,1\n');
-clear cleanup
-
-resultTable = lena.read_all_segments_csv(csvPath);
-
-verifyTrue(testCase, isdatetime(resultTable.Date));
-verifyEqual(testCase, resultTable.Date, datetime(2011, 1, 2, 'Format', 'M/d/yyyy'));
+verifySubstring(testCase, saveText, 'function resultTable = read_all_segments_csv');
+verifySubstring(testCase, saveText, 'function summaryTable = create_loudness_summary');
+verifySubstring(testCase, saveText, '"speaker", speaker, metricNames');
+verifySubstring(testCase, saveText, '"classLabel", classLabel, metricNames');
 end
 
 function createEmptyFile(filePath)

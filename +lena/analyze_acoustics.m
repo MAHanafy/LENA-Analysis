@@ -190,8 +190,8 @@ function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, fr
     else
         dBFS = -Inf;
     end
-    dBSPL = lena.dbfs_to_dbspl(dBFS);
-    loudnessStats = lena.compute_loudness_variability_stats( ...
+    dBSPL = dbfs_to_dbspl(dBFS);
+    loudnessStats = compute_loudness_variability_stats( ...
         cWav, rate, frame_length, TimeStep, 1e-6);
     sCount = estimate_syllables(cWav, rate);
 
@@ -237,7 +237,7 @@ function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, fr
         fmin  = min(fx);
         fmax  = max(fx);
         f0_range=fmax-fmin;
-        f0_rangeST = lena.f0_range_semitones(fmin, fmax);
+        f0_rangeST = f0_range_semitones(fmin, fmax);
         durUtt = (length(cWav)/rate)*1000;
         durVx  = length(fx)*TimeStep;
         durPct = durVx / durUtt;
@@ -343,8 +343,8 @@ function row = analyze_interval_original_1based(intervals, q, fname, F0MinMax,..
     else
         dBFS = -Inf;
     end
-    dBSPL = lena.dbfs_to_dbspl(dBFS);
-    loudnessStats = lena.compute_loudness_variability_stats( ...
+    dBSPL = dbfs_to_dbspl(dBFS);
+    loudnessStats = compute_loudness_variability_stats( ...
         cWav, rate, frame_length, TimeStep, 1e-6);
     sCount = estimate_syllables(cWav, rate);
 
@@ -388,7 +388,7 @@ function row = analyze_interval_original_1based(intervals, q, fname, F0MinMax,..
     row.f0min = min(fx);
     row.f0max = max(fx);
     row.f0range = row.f0max - row.f0min;
-    row.f0rangeST = lena.f0_range_semitones(row.f0min, row.f0max);
+    row.f0rangeST = f0_range_semitones(row.f0min, row.f0max);
    
 end
 
@@ -580,5 +580,73 @@ function syllableCount = estimate_syllables(signal, fs)
         [peaks, ~] = findpeaks(envDB, 'MinPeakDistance', actualMinPeakDistance, 'MinPeakHeight', -20);
         syllableCount = length(peaks);
     end
+end
+
+function dBSPL = dbfs_to_dbspl(dBFS)
+dBSPL = dBFS;
+finiteMask = isfinite(dBFS);
+dBSPL(finiteMask) = dBFS(finiteMask) + 97;
+end
+
+function rangeST = f0_range_semitones(f0min, f0max)
+rangeST = nan(size(f0min));
+validMask = isfinite(f0min) & isfinite(f0max) & f0min > 0 & f0max > 0;
+rangeST(validMask) = 12 * log2(f0max(validMask) ./ f0min(validMask));
+end
+
+function stats = compute_loudness_variability_stats(signal, fs, frameLengthMs, frameStepMs, minRms)
+if nargin < 5 || isempty(minRms)
+    minRms = 1e-6;
+end
+if nargin < 4 || isempty(frameStepMs)
+    frameStepMs = 10;
+end
+if nargin < 3 || isempty(frameLengthMs)
+    frameLengthMs = 20;
+end
+
+emptyStats = struct('loudnessStd', NaN, 'loudnessRange', NaN, ...
+    'loudnessIQR', NaN, 'nValidFrames', 0);
+if isempty(signal)
+    stats = emptyStats;
+    return;
+end
+
+frameSamples = round(frameLengthMs / 1000 * fs);
+stepSamples = round(frameStepMs / 1000 * fs);
+if frameSamples <= 0 || stepSamples <= 0
+    stats = emptyStats;
+    return;
+end
+
+if numel(signal) < frameSamples
+    frameSamples = numel(signal);
+    stepSamples = 1;
+    nFrames = 1;
+else
+    nFrames = floor((numel(signal) - frameSamples) / stepSamples) + 1;
+end
+
+dbfsValues = nan(nFrames, 1);
+for frameIndex = 1:nFrames
+    startIndex = (frameIndex - 1) * stepSamples + 1;
+    endIndex = startIndex + frameSamples - 1;
+    frame = signal(startIndex:endIndex);
+    frameRms = rms(frame);
+    if frameRms > minRms
+        dbfsValues(frameIndex) = 20 * log10(frameRms);
+    end
+end
+
+validDbfs = dbfsValues(isfinite(dbfsValues));
+if isempty(validDbfs)
+    stats = emptyStats;
+    return;
+end
+
+stats = struct('loudnessStd', std(validDbfs), ...
+    'loudnessRange', max(validDbfs) - min(validDbfs), ...
+    'loudnessIQR', prctile(validDbfs, 75) - prctile(validDbfs, 25), ...
+    'nValidFrames', numel(validDbfs));
 end
 

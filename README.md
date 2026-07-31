@@ -45,11 +45,6 @@ LENA/
 │   ├── process_recording.m
 │   ├── classify_interactions.m
 │   ├── analyze_acoustics.m
-│   ├── compute_loudness_variability_stats.m
-│   ├── create_loudness_summary.m
-│   ├── dbfs_to_dbspl.m
-│   ├── f0_range_semitones.m
-│   ├── read_all_segments_csv.m
 │   ├── save_results.m
 │   └── create_plots.m
 ├── legacy/
@@ -65,13 +60,8 @@ Responsibilities are intentionally broad so the project remains compact:
 - `find_recordings.m`: recursive ITS discovery and recording metadata
 - `process_recording.m`: ITS reading, interval parsing, and per-recording orchestration
 - `classify_interactions.m`: v3 turn-pair classification and empty-session diagnostic counts
-- `analyze_acoustics.m`: F0, semitone F0 range, dBFS, estimated dBSPL, loudness variability, and syllable calculations
-- `compute_loudness_variability_stats.m`: frame-level `loudnessStd`, `loudnessRange`, and `loudnessIQR`
-- `create_loudness_summary.m`: overall, speaker, and interaction-class summaries
-- `dbfs_to_dbspl.m`: estimated dB SPL conversion using a fixed 97 dB offset
-- `f0_range_semitones.m`: positive-frequency F0 range conversion to semitones
-- `read_all_segments_csv.m`: unambiguous `M/d/yyyy` date import for subject merges
-- `save_results.m`: metadata columns, CSV/MAT export, diagnostics, folder mirroring, and subject merge
+- `analyze_acoustics.m`: F0, semitone F0 range, dBFS, estimated dBSPL, loudness variability, syllable calculations, and their local calculation helpers
+- `save_results.m`: metadata columns, CSV/MAT export, diagnostics, date import, loudness summaries, folder mirroring, and subject merge
 - `create_plots.m`: evaluation and classifier-comparison plots
 - `legacy/acoust_detail_funcs_original.m`: frozen pre-refactor implementation for reference
 
