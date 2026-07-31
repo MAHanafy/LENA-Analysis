@@ -60,7 +60,7 @@ Responsibilities are intentionally broad so the project remains compact:
 - `find_recordings.m`: recursive ITS discovery and recording metadata
 - `process_recording.m`: ITS reading, interval parsing, and per-recording orchestration
 - `classify_interactions.m`: unchanged v3 turn-pair classifier
-- `analyze_acoustics.m`: unchanged F0, dBFS, and syllable calculations
+- `analyze_acoustics.m`: F0, semitone F0 range, dBFS, estimated dBSPL, and syllable calculations
 - `save_results.m`: metadata columns, CSV/MAT export, folder mirroring, and subject merge
 - `create_plots.m`: evaluation and classifier-comparison plots
 - `legacy/acoust_detail_funcs_original.m`: frozen pre-refactor implementation for reference

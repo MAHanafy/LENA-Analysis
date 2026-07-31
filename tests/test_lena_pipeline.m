@@ -119,6 +119,12 @@ verifyTrue(testCase, isfile(legacyFile));
 verifySubstring(testCase, fileread(compatibilityFile), 'run_lena_analysis');
 end
 
+function testAcousticConversions(testCase)
+verifyEqual(testCase, lena.f0_range_semitones(100, 200), 12, 'AbsTol', 1e-12);
+verifyTrue(testCase, isnan(lena.f0_range_semitones(0, 200)));
+verifyEqual(testCase, lena.dbfs_to_dbspl([-97 -20 -Inf]), [0 77 -Inf]);
+end
+
 function createEmptyFile(filePath)
 fileId = fopen(filePath, 'w');
 if fileId < 0

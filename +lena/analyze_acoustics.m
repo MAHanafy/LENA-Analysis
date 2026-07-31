@@ -131,7 +131,10 @@ function dataOut = analyze_category_original(label, intervals, fname, F0MinMax, 
             dataOut(q).f0std    = row.f0std;
             dataOut(q).f0min    = row.f0min;
             dataOut(q).f0max    = row.f0max;
+            dataOut(q).f0range  = row.f0range;
+            dataOut(q).f0rangeST = row.f0rangeST;
             dataOut(q).dBFS     = row.dBFS;
+            dataOut(q).dBSPL    = row.dBSPL;
         end
         disp(['working on ' label ' ' num2str(q) ' of ' num2str(length(intervals))]);
     end
@@ -187,6 +190,7 @@ function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, fr
     else
         dBFS = -Inf;
     end
+    dBSPL = lena.dbfs_to_dbspl(dBFS);
     sCount = estimate_syllables(cWav, rate);
 
     % Start with a valid non-F0 result. If shrp finds enough voiced frames,
@@ -198,7 +202,9 @@ function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, fr
                  'f0min', NaN, ...
                  'f0max', NaN, ...
                  'f0range', NaN, ...
+                 'f0rangeST', NaN, ...
                  'dBFS', dBFS, ...
+                 'dBSPL', dBSPL, ...
                  'syllableCount', sCount, ...
                  'syllablesPerSec', sCount / (durUtt/1000));
 
@@ -226,18 +232,10 @@ function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, fr
         fmin  = min(fx);
         fmax  = max(fx);
         f0_range=fmax-fmin;
+        f0_rangeST = lena.f0_range_semitones(fmin, fmax);
         durUtt = (length(cWav)/rate)*1000;
         durVx  = length(fx)*TimeStep;
         durPct = durVx / durUtt;
-
-        rmsVal = rms(cWav);
-
-        if rmsVal > 0
-            dBFS = 20 * log10(rmsVal);
-            dBSPL= dBFS + 97; % Convert dBFS to dBSPL using reference of 97 dB SPL at 0 dBFS
-        else
-            dBFS = -Inf;
-        end
 
         sCount = estimate_syllables(cWav, rate);   
         row = struct('durUtt', durUtt, ...
@@ -247,6 +245,7 @@ function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, fr
                      'f0min', fmin, ...
                      'f0max', fmax, ...
                      'f0range', f0_range, ...
+                     'f0rangeST', f0_rangeST, ...
                      'dBFS', dBFS, ...
                      'dBSPL', dBSPL, ...
                      'syllableCount', sCount, ...
@@ -336,6 +335,7 @@ function row = analyze_interval_original_1based(intervals, q, fname, F0MinMax,..
     else
         dBFS = -Inf;
     end
+    dBSPL = lena.dbfs_to_dbspl(dBFS);
     sCount = estimate_syllables(cWav, rate);
 
     % Return non-F0 measurements even if shrp finds too little voicing.
@@ -346,7 +346,9 @@ function row = analyze_interval_original_1based(intervals, q, fname, F0MinMax,..
                  'f0min', NaN, ...
                  'f0max', NaN, ...
                  'f0range', NaN, ...
+                 'f0rangeST', NaN, ...
                  'dBFS', dBFS, ...
+                 'dBSPL', dBSPL, ...
                  'syllableCount', sCount, ...
                  'syllablesPerSec', sCount / (durUtt/1000));
 
@@ -373,6 +375,7 @@ function row = analyze_interval_original_1based(intervals, q, fname, F0MinMax,..
     row.f0min = min(fx);
     row.f0max = max(fx);
     row.f0range = row.f0max - row.f0min;
+    row.f0rangeST = lena.f0_range_semitones(row.f0min, row.f0max);
    
 end
 
@@ -387,7 +390,7 @@ function segmentTable = add_acoustics_to_segment_table(segmentTable, fname, rate
 % cannot produce enough voiced F0 frames.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    acousticNames = {'f0mean','f0std','f0min','f0max','f0range','dBFS', ...
+    acousticNames = {'f0mean','f0std','f0min','f0max','f0range','f0rangeST','dBFS','dBSPL', ...
         'pctUttVx','syllableCount','syllablesPerSec'};
 
     if isempty(segmentTable)
@@ -425,7 +428,7 @@ function interactionResults = sync_acoustics_from_segment_table(segmentTable, in
 % the classified interaction rows without analyzing the WAV twice.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    acousticNames = {'f0mean','f0std','f0min','f0max','f0range','dBFS', ...
+    acousticNames = {'f0mean','f0std','f0min','f0max','f0range','f0rangeST','dBFS','dBSPL', ...
         'pctUttVx','syllableCount','syllablesPerSec'};
 
     if isempty(interactionResults)
