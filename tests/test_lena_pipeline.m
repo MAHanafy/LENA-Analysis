@@ -160,9 +160,7 @@ saveFile = fullfile(testCase.TestData.repoRoot, '+lena', 'save_results.m');
 saveText = fileread(saveFile);
 
 verifySubstring(testCase, saveText, 'function resultTable = read_all_segments_csv');
-verifySubstring(testCase, saveText, 'function summaryTable = create_loudness_summary');
-verifySubstring(testCase, saveText, '"speaker", speaker, metricNames');
-verifySubstring(testCase, saveText, '"classLabel", classLabel, metricNames');
+verifyFalse(testCase, contains(saveText, 'Loudness_Summary'));
 end
 
 function testSubjectWorkbookMergeRunsAsFinalization(testCase)
@@ -188,12 +186,9 @@ finalResult = lena.save_results(finalResult, fixture.Folder, lena.config(), true
 outputXlsx = finalResult.subjectWorkbook;
 allSegments = readtable(outputXlsx, 'Sheet', 'All_Segments', ...
     'VariableNamingRule', 'preserve');
-loudnessSummary = readtable(outputXlsx, 'Sheet', 'Loudness_Summary', ...
-    'VariableNamingRule', 'preserve');
 
 verifyEqual(testCase, height(allSegments), 2);
-verifyTrue(testCase, any(string(loudnessSummary.level) == "speaker"));
-verifyTrue(testCase, any(string(loudnessSummary.level) == "classLabel"));
+verifyFalse(testCase, any(strcmpi(sheetnames(outputXlsx), 'Loudness_Summary')));
 end
 
 function createEmptyFile(filePath)

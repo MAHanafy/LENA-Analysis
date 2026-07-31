@@ -61,7 +61,7 @@ Responsibilities are intentionally broad so the project remains compact:
 - `process_recording.m`: ITS reading, interval parsing, and per-recording orchestration
 - `classify_interactions.m`: v3 turn-pair classification and empty-session diagnostic counts
 - `analyze_acoustics.m`: F0, semitone F0 range, dBFS, estimated dBSPL, loudness variability, syllable calculations, and their local calculation helpers
-- `save_results.m`: recording-level exports plus one final subject-level workbook merge, date-safe CSV import, and loudness summaries
+- `save_results.m`: recording-level exports plus one final subject-level workbook merge and date-safe CSV import
 - `create_plots.m`: evaluation and classifier-comparison plots
 - `legacy/acoust_detail_funcs_original.m`: frozen pre-refactor implementation for reference
 
@@ -104,10 +104,7 @@ results_YYYYMMDD/
 
 The first four interaction CSV columns are `file name`, `subject name`, `Session ID`, and `Date`. Date values are explicitly imported and exported using `M/d/yyyy` without a time.
 
-The merged subject workbook contains:
-
-- `All_Segments`: all exported segment rows from completed recording CSV files
-- `Loudness_Summary`: descriptive statistics for the three loudness metrics overall, by speaker, and by non-empty interaction class
+The merged subject workbook contains one `All_Segments` sheet with all exported segment rows from completed recording CSV files. Loudness summary sheets are intentionally not generated; comparisons across speakers or interaction types should be calculated from the segment-level columns.
 
 When no interactions are produced, `*_EMPTY_SESSION_DIAGNOSTIC.csv` reports the number of AICM conversations, candidate and accepted segments, immediate-neighbor rejections, valid speech segments, interaction pairs, output rows, and a plain-language reason.
 
