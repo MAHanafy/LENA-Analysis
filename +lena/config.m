@@ -26,7 +26,7 @@ cfg.interaction.supportedLabels = {'MANtoMAN','MANtoFAN','FANtoMAN','FANtoFAN', 
     'MANtoCHN','CHNtoMAN','FANtoCHN','CHNtoFAN'};
 
 cfg.nameCorrespondencesFile = ...
-    'F:\SynologyDrive\Cougar_union\Name_Correspondences.xlsx';
+    'F:\SynologyDrive\Cougar_union\Name_Correspondences_correct_final.xlsx';
 cfg.defaultBaseDir = 'F:\SynologyDrive\Cougar_union\HA';
 cfg.createPlots = true;
 end
