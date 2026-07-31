@@ -1,5 +1,14 @@
-function result = save_results(result, resultsFolder, cfg)
-%SAVE_RESULTS Write unchanged recording outputs and refresh the subject workbook.
+function result = save_results(result, resultsFolder, cfg, finalizeSubject)
+%SAVE_RESULTS Write recording outputs or finalize one subject workbook.
+
+if nargin < 4
+    finalizeSubject = false;
+end
+if finalizeSubject
+    result.subjectWorkbook = merge_subject_all_segments( ...
+        result.subjectResultsFolder, result.subjectName);
+    return;
+end
 
 subjectResultsFolder = build_mirrored_subject_results_folder( ...
     resultsFolder, result.currDir, result.subjectName);
@@ -16,13 +25,6 @@ save_outputs_original(itsResultsFolder, result.subjectName, result.fname, ...
     result.dataF0c, result.dataF0c2f, result.dataF0c2m, result.dataF0f, ...
     result.dataF0m, result.interactionResults, result.segmentTable, ...
     result.turnPairs, result.emptySessionDiagnostic, cfg.nameCorrespondencesFile);
-
-try
-    merge_subject_all_segments(subjectResultsFolder, result.subjectName);
-catch mergeError
-    warning('Could not refresh merged workbook for %s: %s', ...
-        result.subjectName, mergeError.message);
-end
 
 result.resultsFolder = itsResultsFolder;
 result.subjectResultsFolder = subjectResultsFolder;
@@ -223,54 +225,6 @@ function subjectFolder = build_mirrored_subject_results_folder(resultsFolder, so
         subjectFolder = fullfile(resultsFolder, subjectName);
     end
 end
-
-function merge_subject_all_segments(subjectFolder, subjectName)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Merge all completed recording-level All-Segments CSVs for one subject.
-% This function is called after every successful session so the workbook is
-% always current, even during a long cohort-level run.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    csvFiles = dir(fullfile(subjectFolder, '**', '*_AICM_INTERACTIONS_All_Segments.csv'));
-    if isempty(csvFiles)
-        return;
-    end
-
-    [~, order] = sort({csvFiles.name});
-    csvFiles = csvFiles(order);
-    mergedTable = table();
-
-    for f = 1:numel(csvFiles)
-        csvPath = fullfile(csvFiles(f).folder, csvFiles(f).name);
-        currentTable = read_all_segments_csv(csvPath);
-        if isempty(mergedTable)
-            mergedTable = currentTable;
-        else
-            if ~isequal(mergedTable.Properties.VariableNames, currentTable.Properties.VariableNames)
-                error('Cannot merge All-Segments CSVs because columns differ: %s', csvPath);
-            end
-            mergedTable = [mergedTable; currentTable]; %#ok<AGROW>
-        end
-    end
-
-    sortColumns = {'Date','file name','conversationId','startSec'};
-    sortColumns = sortColumns(ismember(sortColumns, mergedTable.Properties.VariableNames));
-    if ~isempty(sortColumns)
-        mergedTable = sortrows(mergedTable, sortColumns);
-    end
-    if ismember('Date', mergedTable.Properties.VariableNames) && isdatetime(mergedTable.('Date'))
-        mergedTable.('Date').Format = 'M/d/yyyy';
-    end
-
-    outputXlsx = fullfile(subjectFolder, [subjectName '_AICM_INTERACTIONS_All_Segments.xlsx']);
-    writetable(mergedTable, outputXlsx, 'Sheet', 'All_Segments', 'WriteMode', 'overwritesheet');
-    loudnessSummary = create_loudness_summary(mergedTable);
-    writetable(loudnessSummary, outputXlsx, 'Sheet', 'Loudness_Summary', 'WriteMode', 'overwritesheet');
-    fprintf('Merged %d completed sessions (%d rows) for %s into:\n  %s\n', ...
-        numel(csvFiles), height(mergedTable), subjectName, outputXlsx);
-end
-
-
 
 function allSegmentsTable = create_all_segments_table(segmentTable, interactionResults, turnPairs)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -518,7 +472,6 @@ function val = tableColOrDefault(tbl, rowIdx, colName, defaultVal)
         val = defaultVal;
     end
 end
-
 function val = tableColOrNan(tbl, rowIdx, colName)
     %TABLECOLORNAN Read an optional table column, falling back to NaN.
     %   Acoustic columns are added only when their analyses are enabled, so
@@ -528,6 +481,47 @@ function val = tableColOrNan(tbl, rowIdx, colName)
     else
         val = NaN;
     end
+end
+
+function outputXlsx = merge_subject_all_segments(subjectFolder, subjectName)
+csvFiles = dir(fullfile(subjectFolder, '**', '*_AICM_INTERACTIONS_All_Segments.csv'));
+if isempty(csvFiles)
+    outputXlsx = '';
+    return;
+end
+
+[~, order] = sort({csvFiles.name});
+csvFiles = csvFiles(order);
+mergedTable = table();
+
+for fileIndex = 1:numel(csvFiles)
+    csvPath = fullfile(csvFiles(fileIndex).folder, csvFiles(fileIndex).name);
+    currentTable = read_all_segments_csv(csvPath);
+    if isempty(mergedTable)
+        mergedTable = currentTable;
+    else
+        if ~isequal(mergedTable.Properties.VariableNames, currentTable.Properties.VariableNames)
+            error('Cannot merge All-Segments CSVs because columns differ: %s', csvPath);
+        end
+        mergedTable = [mergedTable; currentTable]; %#ok<AGROW>
+    end
+end
+
+sortColumns = {'Date','file name','conversationId','startSec'};
+sortColumns = sortColumns(ismember(sortColumns, mergedTable.Properties.VariableNames));
+if ~isempty(sortColumns)
+    mergedTable = sortrows(mergedTable, sortColumns);
+end
+if ismember('Date', mergedTable.Properties.VariableNames) && isdatetime(mergedTable.('Date'))
+    mergedTable.('Date').Format = 'M/d/yyyy';
+end
+
+outputXlsx = fullfile(subjectFolder, [subjectName '_AICM_INTERACTIONS_All_Segments.xlsx']);
+writetable(mergedTable, outputXlsx, 'Sheet', 'All_Segments', 'WriteMode', 'overwritesheet');
+loudnessSummary = create_loudness_summary(mergedTable);
+writetable(loudnessSummary, outputXlsx, 'Sheet', 'Loudness_Summary', 'WriteMode', 'overwritesheet');
+fprintf('Merged %d completed sessions (%d rows) for %s into:\n  %s\n', ...
+    numel(csvFiles), height(mergedTable), subjectName, outputXlsx);
 end
 
 function resultTable = read_all_segments_csv(csvPath)

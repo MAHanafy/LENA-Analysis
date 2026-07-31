@@ -13,6 +13,7 @@ cfg.Ceiling = 1250;
 cfg.med_smooth = 0;
 cfg.CHECK_VOICING = 1;
 cfg.trimEdgeFrames = 2;
+cfg.dBSPLCalibrationOffset = 97;
 
 cfg.interaction.adjacencyWindowSec = 5.0;
 cfg.interaction.minDurationSec = 0.10;

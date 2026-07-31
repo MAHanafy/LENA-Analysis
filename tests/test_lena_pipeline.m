@@ -21,6 +21,7 @@ verifyEqual(testCase, cfg.Ceiling, 1250);
 verifyEqual(testCase, cfg.med_smooth, 0);
 verifyEqual(testCase, cfg.CHECK_VOICING, 1);
 verifyEqual(testCase, cfg.trimEdgeFrames, 2);
+verifyEqual(testCase, cfg.dBSPLCalibrationOffset, 97);
 verifyEqual(testCase, cfg.interaction.adjacencyWindowSec, 5.0);
 verifyEqual(testCase, cfg.interaction.minDurationSec, 0.10);
 verifyTrue(testCase, cfg.interaction.requireSpeechEvidence);
@@ -149,7 +150,7 @@ analysisText = fileread(analysisFile);
 verifySubstring(testCase, analysisText, 'function dBSPL = dbfs_to_dbspl');
 verifySubstring(testCase, analysisText, 'function rangeST = f0_range_semitones');
 verifySubstring(testCase, analysisText, 'function stats = compute_loudness_variability_stats');
-verifySubstring(testCase, analysisText, 'dBFS(finiteMask) + 97');
+verifySubstring(testCase, analysisText, 'dBFS(finiteMask) + calibrationOffset');
 verifySubstring(testCase, analysisText, '12 * log2');
 verifyFalse(testCase, contains(analysisText, 'loudnessCV'));
 end
@@ -162,6 +163,37 @@ verifySubstring(testCase, saveText, 'function resultTable = read_all_segments_cs
 verifySubstring(testCase, saveText, 'function summaryTable = create_loudness_summary');
 verifySubstring(testCase, saveText, '"speaker", speaker, metricNames');
 verifySubstring(testCase, saveText, '"classLabel", classLabel, metricNames');
+end
+
+function testSubjectWorkbookMergeRunsAsFinalization(testCase)
+fixture = testCase.applyFixture( ...
+    matlab.unittest.fixtures.TemporaryFolderFixture);
+subjectFolder = fullfile(fixture.Folder, 'S1AC');
+sessionFolders = {fullfile(subjectFolder, 'session1'), fullfile(subjectFolder, 'session2')};
+
+for sessionIndex = 1:numel(sessionFolders)
+    mkdir(sessionFolders{sessionIndex});
+    sourceTable = table("file" + sessionIndex, "S1AC", sessionIndex, ...
+        datetime(2015, 4, 12 + sessionIndex, 'Format', 'M/d/yyyy'), sessionIndex, ...
+        "CHN", "FANtoCHN", sessionIndex, 2 * sessionIndex, 3 * sessionIndex, ...
+        'VariableNames', {'file name','subject name','Session ID','Date', ...
+        'conversationId','speaker','classLabel','loudnessStd','loudnessRange','loudnessIQR'});
+    csvPath = fullfile(sessionFolders{sessionIndex}, ...
+        sprintf('session%d_AICM_INTERACTIONS_All_Segments.csv', sessionIndex));
+    writetable(sourceTable, csvPath);
+end
+
+finalResult = struct('subjectResultsFolder', subjectFolder, 'subjectName', 'S1AC');
+finalResult = lena.save_results(finalResult, fixture.Folder, lena.config(), true);
+outputXlsx = finalResult.subjectWorkbook;
+allSegments = readtable(outputXlsx, 'Sheet', 'All_Segments', ...
+    'VariableNamingRule', 'preserve');
+loudnessSummary = readtable(outputXlsx, 'Sheet', 'Loudness_Summary', ...
+    'VariableNamingRule', 'preserve');
+
+verifyEqual(testCase, height(allSegments), 2);
+verifyTrue(testCase, any(string(loudnessSummary.level) == "speaker"));
+verifyTrue(testCase, any(string(loudnessSummary.level) == "classLabel"));
 end
 
 function createEmptyFile(filePath)

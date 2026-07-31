@@ -44,14 +44,31 @@ if ~exist(resultsFolder, 'dir')
     mkdir(resultsFolder);
 end
 
+subjectResultFolders = strings(0, 1);
+subjectNames = strings(0, 1);
 for ik = 1:numel(recordings)
     result = lena.process_recording(recordings(ik), cfg);
     result = lena.save_results(result, resultsFolder, cfg);
     lena.create_plots(result, cfg);
+    subjectResultFolders(end + 1, 1) = string(result.subjectResultsFolder);
+    subjectNames(end + 1, 1) = string(result.subjectName);
 
     disp(' ');
     disp('Done.');
     disp(['file: ' result.baseName ', here: ' result.resultsFolder])
+end
+
+[uniqueSubjectFolders, subjectIndexes] = unique(subjectResultFolders, 'stable');
+for subjectIndex = 1:numel(uniqueSubjectFolders)
+    try
+        finalResult = struct( ...
+            'subjectResultsFolder', char(uniqueSubjectFolders(subjectIndex)), ...
+            'subjectName', char(subjectNames(subjectIndexes(subjectIndex))));
+        lena.save_results(finalResult, resultsFolder, cfg, true);
+    catch mergeError
+        warning('Could not create merged workbook for %s: %s', ...
+            subjectNames(subjectIndexes(subjectIndex)), mergeError.message);
+    end
 end
 
 toc

@@ -6,27 +6,33 @@ function result = analyze_acoustics(result, cfg)
 
 dataF0c2f = analyze_category_original('C2F', result.tCHN2FAN, result.fname, [200 600], ...
     dataF0c2f, result.age, result.subjectName, cfg.rate, cfg.frame_length, cfg.TimeStep, ...
-    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, cfg.trimEdgeFrames);
+    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, ...
+    cfg.trimEdgeFrames, cfg.dBSPLCalibrationOffset);
 
 dataF0c2m = analyze_category_original('C2M', result.tCHN2MAN, result.fname, [200 600], ...
     dataF0c2m, result.age, result.subjectName, cfg.rate, cfg.frame_length, cfg.TimeStep, ...
-    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, cfg.trimEdgeFrames);
+    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, ...
+    cfg.trimEdgeFrames, cfg.dBSPLCalibrationOffset);
 
 dataF0c = analyze_category_original('C', result.tCHN, result.fname, [200 600], ...
     dataF0c, result.age, result.subjectName, cfg.rate, cfg.frame_length, cfg.TimeStep, ...
-    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, cfg.trimEdgeFrames);
+    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, ...
+    cfg.trimEdgeFrames, cfg.dBSPLCalibrationOffset);
 
 dataF0f = analyze_category_original('F', result.tFAN, result.fname, [120 400], ...
     dataF0f, result.age, result.subjectName, cfg.rate, cfg.frame_length, cfg.TimeStep, ...
-    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, cfg.trimEdgeFrames);
+    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, ...
+    cfg.trimEdgeFrames, cfg.dBSPLCalibrationOffset);
 
 dataF0m = analyze_category_original('M', result.tMAN, result.fname, [50 250], ...
     dataF0m, result.age, result.subjectName, cfg.rate, cfg.frame_length, cfg.TimeStep, ...
-    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, cfg.trimEdgeFrames);
+    cfg.SHR_Threshold, cfg.Ceiling, cfg.med_smooth, cfg.CHECK_VOICING, ...
+    cfg.trimEdgeFrames, cfg.dBSPLCalibrationOffset);
 
 result.segmentTable = add_acoustics_to_segment_table(result.segmentTable, result.fname, ...
     cfg.rate, cfg.frame_length, cfg.TimeStep, cfg.SHR_Threshold, cfg.Ceiling, ...
-    cfg.med_smooth, cfg.CHECK_VOICING, cfg.trimEdgeFrames);
+    cfg.med_smooth, cfg.CHECK_VOICING, cfg.trimEdgeFrames, ...
+    cfg.dBSPLCalibrationOffset);
 result.interactionResults = sync_acoustics_from_segment_table( ...
     result.segmentTable, result.interactionResults);
 
@@ -75,7 +81,7 @@ function [dataF0c2f, dataF0c2m, dataF0c, dataF0f, dataF0m] = initialize_outputs_
     dataF0m(length(tMAN)).fname = [];
 end
 
-function dataOut = analyze_category_original(label, intervals, fname, F0MinMax, dataOut, currAge, subjName, rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames)
+function dataOut = analyze_category_original(label, intervals, fname, F0MinMax, dataOut, currAge, subjName, rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames, dBSPLCalibrationOffset)
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % ANALYZE_CATEGORY_ORIGINAL
     %
@@ -118,7 +124,7 @@ function dataOut = analyze_category_original(label, intervals, fname, F0MinMax, 
     end
 
     for q = 1:length(intervals)
-        row = analyze_interval_original_1based(intervals, q, fname, F0MinMax, rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames);
+        row = analyze_interval_original_1based(intervals, q, fname, F0MinMax, rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames, dBSPLCalibrationOffset);
         %row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames);
 
         if ~isempty(row)
@@ -140,7 +146,7 @@ function dataOut = analyze_category_original(label, intervals, fname, F0MinMax, 
     end
 end
 
-function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames)
+function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames, dBSPLCalibrationOffset)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % ANALYZE_INTERVAL_ORIGINAL
     %
@@ -190,7 +196,7 @@ function row = analyze_interval_original(intervals, q, fname, F0MinMax, rate, fr
     else
         dBFS = -Inf;
     end
-    dBSPL = dbfs_to_dbspl(dBFS);
+    dBSPL = dbfs_to_dbspl(dBFS, dBSPLCalibrationOffset);
     loudnessStats = compute_loudness_variability_stats( ...
         cWav, rate, frame_length, TimeStep, 1e-6);
     sCount = estimate_syllables(cWav, rate);
@@ -265,7 +271,7 @@ end
 
 
 function row = analyze_interval_original_1based(intervals, q, fname, F0MinMax,...
-    rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames)
+    rate, frame_length, TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames, dBSPLCalibrationOffset)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ANALYZE_INTERVAL_ORIGINAL_1BASED
@@ -343,7 +349,7 @@ function row = analyze_interval_original_1based(intervals, q, fname, F0MinMax,..
     else
         dBFS = -Inf;
     end
-    dBSPL = dbfs_to_dbspl(dBFS);
+    dBSPL = dbfs_to_dbspl(dBFS, dBSPLCalibrationOffset);
     loudnessStats = compute_loudness_variability_stats( ...
         cWav, rate, frame_length, TimeStep, 1e-6);
     sCount = estimate_syllables(cWav, rate);
@@ -394,7 +400,7 @@ end
 
 
 function segmentTable = add_acoustics_to_segment_table(segmentTable, fname, rate, frame_length, TimeStep, ...
-    SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames)
+    SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames, dBSPLCalibrationOffset)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ADD_ACOUSTICS_TO_SEGMENT_TABLE
 %
@@ -421,7 +427,7 @@ function segmentTable = add_acoustics_to_segment_table(segmentTable, fname, rate
     for q = 1:nRows
         F0MinMax = choose_f0_range(char(segmentTable.speaker(q)));
         row = analyze_interval_original_1based(intervals, q, fname, F0MinMax, rate, frame_length, ...
-            TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames);
+            TimeStep, SHR_Threshold, Ceiling, med_smooth, CHECK_VOICING, trimEdgeFrames, dBSPLCalibrationOffset);
         if isempty(row)
             continue;
         end
@@ -582,10 +588,10 @@ function syllableCount = estimate_syllables(signal, fs)
     end
 end
 
-function dBSPL = dbfs_to_dbspl(dBFS)
+function dBSPL = dbfs_to_dbspl(dBFS, calibrationOffset)
 dBSPL = dBFS;
 finiteMask = isfinite(dBFS);
-dBSPL(finiteMask) = dBFS(finiteMask) + 97;
+dBSPL(finiteMask) = dBFS(finiteMask) + calibrationOffset;
 end
 
 function rangeST = f0_range_semitones(f0min, f0max)

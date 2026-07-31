@@ -56,12 +56,12 @@ LENA/
 
 Responsibilities are intentionally broad so the project remains compact:
 
-- `config.m`: paths and all numeric/classifier parameters
+- `config.m`: paths, calibration, and all numeric/classifier parameters
 - `find_recordings.m`: recursive ITS discovery and recording metadata
 - `process_recording.m`: ITS reading, interval parsing, and per-recording orchestration
 - `classify_interactions.m`: v3 turn-pair classification and empty-session diagnostic counts
 - `analyze_acoustics.m`: F0, semitone F0 range, dBFS, estimated dBSPL, loudness variability, syllable calculations, and their local calculation helpers
-- `save_results.m`: metadata columns, CSV/MAT export, diagnostics, date import, loudness summaries, folder mirroring, and subject merge
+- `save_results.m`: recording-level exports plus one final subject-level workbook merge, date-safe CSV import, and loudness summaries
 - `create_plots.m`: evaluation and classifier-comparison plots
 - `legacy/acoust_detail_funcs_original.m`: frozen pre-refactor implementation for reference
 
@@ -72,7 +72,7 @@ Each analyzed segment can include:
 - `f0mean`, `f0std`, `f0min`, `f0max`, and `f0range` in Hz
 - `f0rangeST`, calculated as `12 * log2(f0max / f0min)` when both values are positive
 - `dBFS`, calculated from the RMS amplitude of the segment
-- `dBSPL`, estimated as `dBFS + 97`; this offset should be confirmed against the recorder calibration before interpreting it as calibrated SPL
+- `dBSPL`, estimated as `dBFS + cfg.dBSPLCalibrationOffset`; the default is 97 dB and should be confirmed against the recorder calibration before interpreting it as calibrated SPL
 - `loudnessStd`, the standard deviation of valid frame-level dBFS values
 - `loudnessRange`, the maximum minus minimum valid frame-level dBFS value
 - `loudnessIQR`, the 75th minus 25th percentile of valid frame-level dBFS values
@@ -116,6 +116,15 @@ The AM28 age vector remains active only when the selected folder itself is named
 ## Configuration
 
 Edit [+lena/config.m](+lena/config.m) to change the default data folder or correspondence workbook. Algorithm parameters are centralized there but retain their pre-refactor values.
+
+The estimated dB SPL calibration offset defaults to 97 dB and can be changed after calibration review:
+
+```matlab
+cfg = lena.config();
+cfg.dBSPLCalibrationOffset = 97;
+```
+
+Subject workbooks are created once per subject after all selected recordings finish, rather than being rebuilt after every recording.
 
 To disable plots for a controlled/test run:
 
