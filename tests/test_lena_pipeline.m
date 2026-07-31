@@ -148,6 +148,29 @@ verifyTrue(testCase, isnan(lena.f0_range_semitones(0, 200)));
 verifyEqual(testCase, lena.dbfs_to_dbspl([-97 -20 -Inf]), [0 77 -Inf]);
 end
 
+function testLoudnessVariabilityMetricsExcludeCv(testCase)
+signal = [0.1 * ones(320, 1); 0.2 * ones(320, 1)];
+stats = lena.compute_loudness_variability_stats(signal, 16000, 20, 20, 1e-6);
+
+verifyEqual(testCase, stats.nValidFrames, 2);
+verifyGreaterThan(testCase, stats.loudnessStd, 0);
+verifyGreaterThan(testCase, stats.loudnessRange, 0);
+verifyGreaterThan(testCase, stats.loudnessIQR, 0);
+verifyFalse(testCase, isfield(stats, 'loudnessCV'));
+end
+
+function testLoudnessSummaryGroupsBySpeakerAndClass(testCase)
+sourceTable = table(["CHN";"CHN";"FAN"], ["FANtoCHN";"FANtoCHN";"CHNtoFAN"], ...
+    [1;2;3], [2;4;6], [3;6;9], ...
+    'VariableNames', {'speaker','classLabel','loudnessStd','loudnessRange','loudnessIQR'});
+
+summaryTable = lena.create_loudness_summary(sourceTable);
+
+verifyTrue(testCase, any(summaryTable.level == "speaker" & summaryTable.group == "CHN"));
+verifyTrue(testCase, any(summaryTable.level == "classLabel" & summaryTable.group == "FANtoCHN"));
+verifyFalse(testCase, any(summaryTable.metric == "loudnessCV"));
+end
+
 function testAllSegmentsDateImportIsMonthFirst(testCase)
 fixture = testCase.applyFixture( ...
     matlab.unittest.fixtures.TemporaryFolderFixture);
