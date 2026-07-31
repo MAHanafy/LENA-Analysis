@@ -517,9 +517,6 @@ if ismember('Date', mergedTable.Properties.VariableNames) && isdatetime(mergedTa
 end
 
 outputXlsx = fullfile(subjectFolder, [subjectName '_AICM_INTERACTIONS_All_Segments.xlsx']);
-if isfile(outputXlsx)
-    delete(outputXlsx);
-end
 writetable(mergedTable, outputXlsx, 'Sheet', 'All_Segments', 'WriteMode', 'overwritesheet');
 fprintf('Merged %d completed sessions (%d rows) for %s into:\n  %s\n', ...
     numel(csvFiles), height(mergedTable), subjectName, outputXlsx);

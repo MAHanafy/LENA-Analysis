@@ -181,10 +181,6 @@ for sessionIndex = 1:numel(sessionFolders)
     writetable(sourceTable, csvPath);
 end
 
-existingWorkbook = fullfile(subjectFolder, 'S1AC_AICM_INTERACTIONS_All_Segments.xlsx');
-writetable(table(1, 'VariableNames', {'oldSummary'}), existingWorkbook, ...
-    'Sheet', 'Loudness_Summary');
-
 finalResult = struct('subjectResultsFolder', subjectFolder, 'subjectName', 'S1AC');
 finalResult = lena.save_results(finalResult, fixture.Folder, lena.config(), true);
 outputXlsx = finalResult.subjectWorkbook;
