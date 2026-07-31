@@ -88,7 +88,7 @@ Outputs retain the established folder hierarchy and filenames while adding the n
 results_YYYYMMDD/
 └── cohort/
     └── subject/
-        ├── subject_AICM_INTERACTIONS_All_Segments.xlsx
+        ├── subject_AICM_INTERACTIONS_All_Recordings.xlsx
         └── recording/
             ├── *_CHN.mat
             ├── *_CHN2FAN.mat
@@ -104,7 +104,7 @@ results_YYYYMMDD/
 
 The first four interaction CSV columns are `file name`, `subject name`, `Session ID`, and `Date`. Date values are explicitly imported and exported using `M/d/yyyy` without a time.
 
-The merged subject workbook contains one `All_Segments` sheet with all exported segment rows from completed recording CSV files. Loudness summary sheets are intentionally not generated; comparisons across speakers or interaction types should be calculated from the segment-level columns.
+The merged subject workbook is named `*_AICM_INTERACTIONS_All_Recordings.xlsx`. It contains one `All_Segments` sheet with all exported segment rows from completed recording CSV files. Loudness summary sheets are intentionally not generated; comparisons across speakers or interaction types should be calculated from the segment-level columns.
 
 When no interactions are produced, `*_EMPTY_SESSION_DIAGNOSTIC.csv` reports the number of AICM conversations, candidate and accepted segments, immediate-neighbor rejections, valid speech segments, interaction pairs, output rows, and a plain-language reason.
 
