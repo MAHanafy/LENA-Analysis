@@ -44,32 +44,51 @@ if ~exist(resultsFolder, 'dir')
     mkdir(resultsFolder);
 end
 
-subjectResultFolders = strings(0, 1);
-subjectNames = strings(0, 1);
+recordingSubjectKeys = strings(size(recordings));
+for recordingIndex = 1:numel(recordings)
+    recordingSubjectKeys(recordingIndex) = subject_source_key( ...
+        recordings(recordingIndex).folder, recordings(recordingIndex).subjectName);
+end
+completedSubjectRecordings = zeros(size(recordingSubjectKeys));
 for ik = 1:numel(recordings)
     result = lena.process_recording(recordings(ik), cfg);
     result = lena.save_results(result, resultsFolder, cfg);
     lena.create_plots(result, cfg);
-    subjectResultFolders(end + 1, 1) = string(result.subjectResultsFolder);
-    subjectNames(end + 1, 1) = string(result.subjectName);
+
+    subjectKey = subject_source_key(result.currDir, result.subjectName);
+    subjectMask = strcmpi(recordingSubjectKeys, subjectKey);
+    completedSubjectRecordings(subjectMask) = ...
+        completedSubjectRecordings(subjectMask) + 1;
+    if completedSubjectRecordings(ik) == nnz(subjectMask)
+        try
+            result = lena.save_results(result, resultsFolder, cfg, true);
+        catch mergeError
+            warning('Could not create merged workbook for %s: %s', ...
+                result.subjectName, mergeError.message);
+        end
+    end
 
     disp(' ');
     disp('Done.');
     disp(['file: ' result.baseName ', here: ' result.resultsFolder])
 end
 
-[uniqueSubjectFolders, subjectIndexes] = unique(subjectResultFolders, 'stable');
-for subjectIndex = 1:numel(uniqueSubjectFolders)
-    try
-        finalResult = struct( ...
-            'subjectResultsFolder', char(uniqueSubjectFolders(subjectIndex)), ...
-            'subjectName', char(subjectNames(subjectIndexes(subjectIndex))));
-        lena.save_results(finalResult, resultsFolder, cfg, true);
-    catch mergeError
-        warning('Could not create merged workbook for %s: %s', ...
-            subjectNames(subjectIndexes(subjectIndex)), mergeError.message);
-    end
+toc
 end
 
-toc
+function key = subject_source_key(sourceFolder, subjectName)
+% Distinguish identical subject IDs that may exist in separate cohorts.
+candidateFolder = char(sourceFolder);
+while ~isempty(candidateFolder)
+    [parentFolder, folderName] = fileparts(candidateFolder);
+    if strcmpi(folderName, subjectName)
+        key = string(lower(candidateFolder));
+        return;
+    end
+    if strcmp(parentFolder, candidateFolder)
+        break;
+    end
+    candidateFolder = parentFolder;
+end
+key = string(lower(subjectName));
 end

@@ -574,14 +574,14 @@ function syllableCount = estimate_syllables(signal, fs)
     
     % If the signal is too short for 100ms distance, use a smaller distance
     % or calculate the max possible distance (length - 1)
-    if len <= desiredMinPeakDistance
+    if len <= desiredMinPeakDistance + 1
         % Fallback for tiny segments: simply count if there's any audible energy
         % If it's too short for findpeaks, we estimate it as 1 syllable 
         % provided it met the initial 20ms length check.
         syllableCount = 1;
     else
         % Ensure MinPeakDistance is strictly less than signal length
-        actualMinPeakDistance = min(desiredMinPeakDistance, len - 1);
+        actualMinPeakDistance = min(desiredMinPeakDistance, len - 2);
         
         [peaks, ~] = findpeaks(envDB, 'MinPeakDistance', actualMinPeakDistance, 'MinPeakHeight', -20);
         syllableCount = length(peaks);

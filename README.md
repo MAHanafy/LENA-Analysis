@@ -121,7 +121,7 @@ cfg = lena.config();
 cfg.dBSPLCalibrationOffset = 97;
 ```
 
-Subject workbooks are created once per subject after all selected recordings finish, rather than being rebuilt after every recording.
+Each subject workbook is created as soon as that subject's final selected recording finishes, rather than waiting for the entire analysis run or rebuilding it after every recording.
 
 To disable plots for a controlled/test run:
 

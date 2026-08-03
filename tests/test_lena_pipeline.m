@@ -155,6 +155,16 @@ verifySubstring(testCase, analysisText, '12 * log2');
 verifyFalse(testCase, contains(analysisText, 'loudnessCV'));
 end
 
+function testSyllablePeakDistanceHandlesBoundaryLength(testCase)
+analysisFile = fullfile(testCase.TestData.repoRoot, '+lena', 'analyze_acoustics.m');
+analysisText = fileread(analysisFile);
+
+verifySubstring(testCase, analysisText, ...
+    'len <= desiredMinPeakDistance + 1');
+verifySubstring(testCase, analysisText, ...
+    'min(desiredMinPeakDistance, len - 2)');
+end
+
 function testOutputHelpersAreConsolidated(testCase)
 saveFile = fullfile(testCase.TestData.repoRoot, '+lena', 'save_results.m');
 saveText = fileread(saveFile);
@@ -189,6 +199,22 @@ allSegments = readtable(outputXlsx, 'Sheet', 'All_Segments', ...
 
 verifyEqual(testCase, height(allSegments), 2);
 verifyFalse(testCase, any(strcmpi(sheetnames(outputXlsx), 'Loudness_Summary')));
+end
+
+function testSubjectFinalizationOccursInsideRecordingLoop(testCase)
+runnerFile = fullfile(testCase.TestData.repoRoot, 'run_lena_analysis.m');
+runnerText = fileread(runnerFile);
+
+loopStart = strfind(runnerText, 'for ik = 1:numel(recordings)');
+finalizationCall = strfind(runnerText, ...
+    'lena.save_results(result, resultsFolder, cfg, true)');
+
+verifyNotEmpty(testCase, loopStart);
+verifyNotEmpty(testCase, finalizationCall);
+verifyGreaterThan(testCase, finalizationCall(1), loopStart(1));
+verifySubstring(testCase, runnerText, ...
+    'completedSubjectRecordings(ik) == nnz(subjectMask)');
+verifyFalse(testCase, contains(runnerText, 'uniqueSubjectFolders'));
 end
 
 function createEmptyFile(filePath)
