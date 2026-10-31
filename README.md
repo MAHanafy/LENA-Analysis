@@ -141,3 +141,18 @@ assertSuccess(results)
 ```
 
 The tests cover configuration values, old/new recording-name discovery, interaction classification, empty-session diagnostics, acoustic conversions, loudness variability, grouped summaries, unambiguous date import, empty output schemas, and the historical compatibility entry point.
+
+
+## ANVUREL annotation assistant
+
+ANVUREL (Assisted Naturalistic Vocal Utterance Review and Emotion Labeling) provides a local Windows interface for batch preparation, explained CDS/ADS suggestions, Praat review, and approved sample extraction. Valence and arousal remain human-reviewed labels.
+
+See [application instructions](anvurel/README.md) and [change history](anvurel/CHANGELOG.md). On Windows, install Python 3.12 with Tcl/Tk, run `anvurel/setup.cmd`, and then launch `anvurel/start.cmd`. Praat setup is described in the application instructions.
+
+Run the application checks with:
+
+```powershell
+anvurel\.venv\Scripts\python.exe -m unittest discover -s anvurel -p "test_*.py" -v
+```
+
+Research recordings, participant materials, generated results, local environments, and Praat binaries are excluded from the source upload.

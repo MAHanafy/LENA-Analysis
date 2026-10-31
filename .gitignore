@@ -5,5 +5,13 @@
 results_*/
 debug.log
 *.asv
-.codex/
 
+# Local study materials and generated application results
+/outputs/
+/Seed26/
+*.ITS
+*.WAV
+
+# Local hidden configuration and working folders
+/.*/
+!/.github/
