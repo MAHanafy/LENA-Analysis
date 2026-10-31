@@ -1,6 +1,7 @@
 """ANVUREL desktop annotation assistant with local batch automation."""
 import argparse
 import json
+import math
 import os
 import queue
 import subprocess
@@ -12,10 +13,12 @@ from tkinter import filedialog, messagebox, ttk
 import automation
 import batch
 import core
+import review_tools
+from guided_ui import GuidedReviewMixin
 
 BASE=Path(__file__).resolve().parent
 
-class Application:
+class Application(GuidedReviewMixin):
     def __init__(self,root):
         self.root,self.run,self.rows=root,None,[]
         self.meta,self.reviews={},{}
@@ -31,31 +34,36 @@ class Application:
             'reviewer':'','speaker':'?','valence':'?','arousal':'?','start':'','end':'',
             'folder':'','batch_group':'Auto','batch_mode':'first','filter':'Needs review'}
         self.vars={k:tk.StringVar(value=v) for k,v in defaults.items()}
+        self.init_guided()
         self.refine=tk.BooleanVar(value=True);self.suggest=tk.BooleanVar(value=True)
         self.autoplay=tk.BooleanVar(value=False);self.autoreload=tk.BooleanVar(value=True)
         self.status=tk.StringVar(value='Select a recording or scan a folder. Processing stays local.')
         self.detail=tk.StringVar(value='Select a candidate to hear its context and review its labels.')
         self.evidence=tk.StringVar(value='No automatic valence or arousal model is included in this release.')
-        root.title('ANVUREL Annotation Assistant 2')
+        root.title('ANVUREL Annotation Assistant '+automation.VERSION)
         root.geometry(f'{min(1280,root.winfo_screenwidth()-80)}x{min(950,root.winfo_screenheight()-90)}')
         root.minsize(1000,700)
         box=ttk.Frame(root,padding=10);box.pack(fill='both',expand=True)
         ttk.Label(box,text='ANVUREL Annotation Assistant',font=('Segoe UI',18,'bold')).pack(anchor='w')
         ttk.Label(box,text='Prepare folders • inspect suggestions • review in Praat • export approved samples').pack(anchor='w',pady=(0,7))
         self.tabs=ttk.Notebook(box);self.tabs.pack(fill='both',expand=True)
-        self.prepare_tab,self.batch_tab,self.review_tab=[ttk.Frame(self.tabs,padding=10) for _ in range(3)]
-        for page,name in [(self.prepare_tab,'Prepare recording'),(self.batch_tab,'Batch preparation'),(self.review_tab,'Review samples')]:self.tabs.add(page,text=name)
-        self.make_prepare();self.make_batch();self.make_review()
+        self.prepare_tab,self.batch_tab,self.guided_tab,self.review_tab=[ttk.Frame(self.tabs,padding=10) for _ in range(4)]
+        for page,name in [(self.prepare_tab,'Prepare recording'),(self.batch_tab,'Batch preparation'),(self.guided_tab,'Guided review'),(self.review_tab,'Review samples')]:self.tabs.add(page,text=name)
+        self.make_prepare();self.make_batch();self.make_review();self.make_guided()
         ttk.Label(box,textvariable=self.status,wraplength=1180).pack(fill='x',pady=(7,0))
         for key in ('speaker','valence','arousal','start','end'):self.vars[key].trace_add('write',self.mark_dirty)
+        root.bind('<Escape>',lambda e:self.stop_audio())
         for key,fn in [('<Control-s>',self.save_labels),('<Control-Return>',self.approve_next),('<Control-Right>',self.next_candidate),('<Control-Left>',lambda:self.next_candidate(-1)),('<F5>',self.play),('<F6>',self.praat)]:root.bind(key,lambda e,fn=fn:fn())
         root.after(300,self.poll);root.after(1000,self.watch)
         root.protocol('WM_DELETE_WINDOW',self.close)
 
     def close(self):
+        if self.praat_active():
+            messagebox.showinfo('Praat review','Finish and save the Praat session before closing ANVUREL.');return
         self.cancel.set()
         if self.busy:
             self.closing=True;self.status.set('Finishing the current excerpt before closing. Batch progress will be saved.');return
+        self.cancel_autosave();self.autosave_form();self.stop_audio()
         for pending in self.root.tk.call('after','info'):
             self.root.after_cancel(pending)
         self.root.destroy()
@@ -137,7 +145,8 @@ class Application:
         ttk.Label(page,text='Ctrl+Enter: save, approve, next • Ctrl+arrows: navigate • F6: Praat. Finish Praat before app edits or approval.\nValence and arousal remain human labels. Suggested CDS/ADS is not a validated probability.',wraplength=1100).pack(anchor='w',pady=(4,0))
 
     def mark_dirty(self,*args):
-        if not self.filling:self.dirty=True
+        if not self.filling:
+            self.dirty=True;self.schedule_draft()
 
     def guard(self,action):
         try:return action()
@@ -246,9 +255,11 @@ class Application:
 
     def load_run(self,path):
         if self.praat_active() and self.run!=Path(path).resolve():raise ValueError('Finish Praat before switching runs.')
-        self.run=Path(path).resolve();self.dirty=False;self.focused_index=None;self.reload_impl();self.tabs.select(self.review_tab)
+        self.cancel_autosave();self.autosave_form();self.stop_audio();self.undo_tokens=[]
+        self.run=Path(path).resolve();self.dirty=False;self.focused_index=None;self.reload_impl();self.tabs.select(self.guided_tab);self.draft_notice()
 
     def reload(self):
+        self.cancel_autosave()
         self.dirty=False
         self.guard(self.reload_impl)
 
@@ -264,6 +275,7 @@ class Application:
         self.filling=False;self.dirty=False;self.render()
         approved=sum(core.valid(r) and core.signature(r) in self.reviews for r in self.rows)
         count=sum(any(r[t] for t in core.TIERS) for r in self.rows)
+        self.review_progress.set(f'{approved} of {count} candidates approved. Unknown labels remain for review.')
         self.status.set(f'{self.run.name} | {self.meta["group"]} | {count} candidates | {approved} approved | source offset {self.meta["source_offset"]:.3f} s')
 
     def render(self):
@@ -298,6 +310,10 @@ class Application:
                 if index!=self.focused_index:self.tree.selection_set(str(self.focused_index))
             self.status.set('Unsaved edits retained. Save or Reload before selecting another candidate.');return
         self.focused_index=index
+        self.stop_audio()
+        candidates=[i for i,r in enumerate(self.rows) if any(r[t] for t in core.TIERS)]
+        approved=sum(core.valid(r) and core.signature(r) in self.reviews for r in self.rows)
+        if index in candidates:self.review_progress.set(f'Candidate {candidates.index(index)+1} of {len(candidates)} | {approved} approved')
         row=self.rows[index];self.filling=True
         for key,tier in [('speaker','speaker_speech'),('valence','valence'),('arousal','arousal')]:self.vars[key].set(row[tier])
         self.vars['start'].set(f'{row["start"]:.6f}');self.vars['end'].set(f'{row["end"]:.6f}')
@@ -309,21 +325,28 @@ class Application:
         self.draw(row)
 
     def draw(self,row):
-        self.canvas.delete('all');w=max(self.canvas.winfo_width(),100);h=80
         a=max(0,row['start']-1);b=min(self.meta['duration'],row['end']+1)
         x=self.samples[round(a*self.rate):round(b*self.rate)]
-        self.canvas.create_rectangle(w*(row['start']-a)/(b-a),0,w*(row['end']-a)/(b-a),h,fill='#e3edf4',outline='')
-        step=max(1,len(x)//w)
-        for k,start in enumerate(range(0,len(x),step)):
-            if k>=w:break
-            chunk=x[start:start+step];self.canvas.create_line(k,h/2-float(chunk.max())*h*.45,k,h/2-float(chunk.min())*h*.45,fill='#245d78')
+        for canvas in (self.canvas,self.guided_canvas):
+            canvas.delete('all');w=max(canvas.winfo_width(),100);h=max(canvas.winfo_height(),80)
+            canvas.create_rectangle(w*(row['start']-a)/(b-a),0,w*(row['end']-a)/(b-a),h,fill='#e3edf4',outline='')
+            step=max(1,len(x)//w)
+            for k,start in enumerate(range(0,len(x),step)):
+                if k>=w:break
+                chunk=x[start:start+step];canvas.create_line(k,h/2-float(chunk.max())*h*.45,k,h/2-float(chunk.min())*h*.45,fill='#245d78')
 
-    def save_labels_impl(self):
+    def save_labels_impl(self,approve=False):
         self.require_editable();idx=self.selected_index();_,rows,_=core.load_run(self.run)
         if rows!=self.rows:raise ValueError('TextGrid changed externally. Reload before saving.')
-        if abs(float(self.vars['start'].get())-rows[idx]['start'])>1e-6 or abs(float(self.vars['end'].get())-rows[idx]['end'])>1e-6:raise ValueError('Apply boundary changes before saving labels.')
+        start,end=float(self.vars['start'].get()),float(self.vars['end'].get())
+        if not all(math.isfinite(value) for value in (start,end)) or abs(start-rows[idx]['start'])>1e-6 or abs(end-rows[idx]['end'])>1e-6:raise ValueError('Apply valid boundary changes before saving labels.')
         rows[idx].update(speaker_speech=self.vars['speaker'].get(),valence=self.vars['valence'].get(),arousal=self.vars['arousal'].get())
-        core.save_annotations(self.run,rows,self.grid_hash);self.reload_impl()
+        if approve and (not self.vars['reviewer'].get().strip() or not core.valid(rows[idx])):
+            raise ValueError('Enter a reviewer ID and complete all labels before approval.')
+        def operation():
+            core.save_annotations(self.run,rows,self.grid_hash)
+            if approve:core.approve(self.run,idx,self.vars['reviewer'].get())
+        self.record_edit(operation);self.reload_impl()
         if str(idx) in self.tree.get_children():self.tree.selection_set(str(idx))
         return idx
 
@@ -331,7 +354,7 @@ class Application:
 
     def approve_next(self):
         def action():
-            idx=self.save_labels_impl();core.approve(self.run,idx,self.vars['reviewer'].get())
+            idx=self.save_labels_impl(approve=True)
             self.reload_impl();ids=self.tree.get_children();following=next((x for x in ids if int(x)>idx),ids[0] if ids else None)
             if following:self.tree.selection_set(following);self.tree.see(following)
             if self.autoplay.get() and following:self.root.after(50,self.play)
@@ -341,7 +364,7 @@ class Application:
         def action():
             self.require_editable();idx=self.selected_index()
             labels=dict(speaker_speech=self.vars['speaker'].get(),valence=self.vars['valence'].get(),arousal=self.vars['arousal'].get())
-            core.set_boundaries(self.run,idx,float(self.vars['start'].get()),float(self.vars['end'].get()),self.grid_hash,labels=labels)
+            self.record_edit(lambda:core.set_boundaries(self.run,idx,float(self.vars['start'].get()),float(self.vars['end'].get()),self.grid_hash,labels=labels))
             self.reload_impl()
             if str(idx) in self.tree.get_children():self.tree.selection_set(str(idx))
         self.guard(action)
@@ -350,14 +373,14 @@ class Application:
         def action():
             self.require_editable()
             if self.dirty:raise ValueError('Save or Reload current form edits before aligning tiers.')
-            core.synchronize_tiers(self.run,core.digest(self.run/'annotations.TextGrid'));self.reload_impl()
+            self.record_edit(lambda:core.synchronize_tiers(self.run,core.digest(self.run/'annotations.TextGrid')));self.reload_impl()
         self.guard(action)
 
     def exclude(self):
         def action():
             self.require_editable();idx=self.selected_index();_,rows,_=core.load_run(self.run)
             if rows!=self.rows:raise ValueError('Reload changed annotations before excluding.')
-            rows[idx].update(**{t:'' for t in core.TIERS});core.save_annotations(self.run,rows,self.grid_hash,action='excluded');self.reload_impl()
+            rows[idx].update(**{t:'' for t in core.TIERS});self.record_edit(lambda:core.save_annotations(self.run,rows,self.grid_hash,action='excluded'));self.reload_impl()
         self.guard(action)
 
     def next_candidate(self,direction=1):
@@ -373,16 +396,14 @@ class Application:
 
     def play(self):
         def action():
-            import winsound
-            row=self.rows[self.selected_index()];target=self.run/'playback.wav';winsound.PlaySound(None,0)
-            core.copy_audio(self.run/'excerpt.wav',target,max(0,row['start']-1),min(self.meta['duration'],row['end']+1))
-            winsound.PlaySound(str(target),winsound.SND_FILENAME|winsound.SND_ASYNC)
+            row=self.rows[self.selected_index()];self.play_range(row['start'],row['end'],context=1.)
         self.guard(action)
 
     def praat(self):
         def action():
             self.require_run()
             if self.dirty:raise ValueError('Save form edits before opening Praat.')
+            self.stop_audio();self.cancel_autosave()
             row=self.rows[self.selected_index()]
             if self.praat_active():core.navigate_praat(self.vars['praat'].get(),self.run,row['start'],row['end'])
             else:self.praat_process=core.open_praat(self.vars['praat'].get(),self.run,row['start'],row['end'])

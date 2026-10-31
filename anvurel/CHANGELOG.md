@@ -1,5 +1,9 @@
 # Change history
 
+## Version 2.1.0
+
+Guided review presents one interval with large label controls, looping, pitch preserving slower playback, and explicit approval. Forms autosave separately for recovery. Session undo restores annotations and approvals together and rejects stale edits. The detailed review table remains available.
+
 ## Version 2.0.1
 
 The application is named ANVUREL and lives in the `anvurel` folder. Default outputs are stored under `outputs/anvurel`. Existing annotations and pilot results remain readable.

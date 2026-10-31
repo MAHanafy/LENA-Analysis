@@ -13,7 +13,7 @@ import numpy as np
 import parselmouth
 from parselmouth.praat import call
 
-VERSION = '2.0.1'
+VERSION = '2.1.0'
 ADULTS = ('FAN', 'MAN')
 TALKERS = ('CHN', 'FAN', 'MAN')
 

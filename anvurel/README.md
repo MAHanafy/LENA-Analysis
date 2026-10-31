@@ -2,7 +2,7 @@
 
 Assisted Naturalistic Vocal Utterance Review and Emotion Labeling
 
-Version 2.0.1
+Version 2.1.0
 
 ANVUREL is a Windows desktop application for annotating adult speech in LENA recordings. It prepares audio excerpts, imports adult segments from ITS metadata, and creates a Praat TextGrid. A researcher checks the boundaries and labels before exporting clips.
 
@@ -54,6 +54,18 @@ The batch table lists each recording or excerpt, its group, and the preparation 
 Progress is saved after every excerpt in `batch.json` and `batch_report.csv`. **Stop after current excerpt** lets the current job finish. Use **Resume batch** later and select the folder containing `batch.json`; completed jobs are skipped.
 
 If a source file changes, create a new batch. When a completed run is missing, its status becomes `needs_check` so an existing review is not silently replaced. Recursive scanning skips generated outputs, Python environments, and symbolic links.
+
+## Guided review
+
+Prepared runs open in **Guided review**. This screen presents one candidate with large buttons for speaker, listener, valence, and arousal. **Review list** opens the detailed table when you need to inspect several intervals.
+
+**Play interval** plays the selection. You can loop it or choose 0.85 or 0.75 playback speed; slower playback uses Praat duration manipulation to preserve pitch. **Play context** includes one second before and after the selection. Press Escape or click **Stop** to stop playback.
+
+The form is saved automatically as a recovery copy after a short pause in editing. This copy does not change the TextGrid or approve a sample. After reopening a run, choose **Restore saved form** to recover it. A form whose audio or annotations have changed is rejected rather than applied to a different interval.
+
+**Save labels** writes the current labels without approval. **Next** and **Previous** save valid form edits before moving. Apply any boundary edits first. **Approve and next** requires all labels and a reviewer ID.
+
+**Undo last change** restores the previous annotations and approvals from this session. If the form has unsaved edits, its first action resets that form. External changes prevent undo from replacing newer work. **Reset form** discards the recovery copy and reloads saved labels. Earlier annotation files are retained in `history` after the session ends.
 
 ## Review the draft
 
