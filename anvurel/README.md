@@ -2,7 +2,7 @@
 
 Assisted Naturalistic Vocal Utterance Review and Emotion Labeling
 
-Version 2.2.0
+Version 2.3.0
 
 ANVUREL is a Windows desktop application for annotating adult speech in LENA recordings. It prepares audio excerpts, imports adult segments from ITS metadata, and creates a Praat TextGrid. A researcher checks the boundaries and labels before exporting clips.
 
@@ -126,6 +126,16 @@ For local speech recognition, run `setup_transcription.cmd` once to install the 
 Generation runs in the background and can be stopped after the current model or decoding step. An incomplete or failed operation retains the previous transcript. Saved text is tied to the excerpt checksum and source offset. Changed audio or invalid times require a new transcript.
 
 Transcript text remains a draft. Listen to confirm its words and timing. Import and generation leave the speaker, emotion, and approval labels unchanged.
+
+## Compare reviewers
+
+Use separate copies of a prepared run for independent annotation. In **Compare reviewers**, select the two review folders and click **Compare reviews**. The excerpts must have identical audio checksums, source offsets, durations, and groups. Comparing a folder with itself is rejected.
+
+The comparison follows time spans rather than row numbers, so a split or shifted boundary does not shift every later label comparison. It lists label disagreements, missing annotations, unknown labels, and approvals still requiring review. Boundary matches are reported separately using a tolerance in seconds; the default is 0.05.
+
+Agreement is the fraction of shared duration with matching known labels. Unknown and missing values are excluded from its denominator. Known draft labels are included, so the display also reports how much audio is approved by both reviewers. This is a description of agreement, not a measure of annotation accuracy. Missing reviewer IDs or shared IDs produce a warning about independence.
+
+Select a difference to open the corresponding interval in the first review, or play its exact audio span. The comparison checks for changed inputs before navigation or saving a report. **Save report** creates a new folder containing `comparison.json`, `differences.csv`, and `agreement.csv`. Neither input review is modified and no consensus labels are applied automatically.
 
 ## How suggestions are made
 

@@ -16,10 +16,11 @@ import core
 import review_tools
 from guided_ui import GuidedReviewMixin
 from transcript_ui import TranscriptUIMixin
+from comparison_ui import ComparisonUIMixin
 
 BASE=Path(__file__).resolve().parent
 
-class Application(GuidedReviewMixin,TranscriptUIMixin):
+class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
     def __init__(self,root):
         self.root,self.run,self.rows=root,None,[]
         self.meta,self.reviews={},{}
@@ -37,6 +38,7 @@ class Application(GuidedReviewMixin,TranscriptUIMixin):
         self.vars={k:tk.StringVar(value=v) for k,v in defaults.items()}
         self.init_guided()
         self.init_transcripts(BASE.parent/'outputs'/'anvurel'/'models')
+        self.init_comparison()
         self.refine=tk.BooleanVar(value=True);self.suggest=tk.BooleanVar(value=True)
         self.autoplay=tk.BooleanVar(value=False);self.autoreload=tk.BooleanVar(value=True)
         self.status=tk.StringVar(value='Select a recording or scan a folder. Processing stays local.')
@@ -49,9 +51,9 @@ class Application(GuidedReviewMixin,TranscriptUIMixin):
         ttk.Label(box,text='ANVUREL Annotation Assistant',font=('Segoe UI',18,'bold')).pack(anchor='w')
         ttk.Label(box,text='Prepare folders • inspect suggestions • review in Praat • export approved samples').pack(anchor='w',pady=(0,7))
         self.tabs=ttk.Notebook(box);self.tabs.pack(fill='both',expand=True)
-        self.prepare_tab,self.batch_tab,self.guided_tab,self.review_tab,self.transcript_tab=[ttk.Frame(self.tabs,padding=10) for _ in range(5)]
-        for page,name in [(self.prepare_tab,'Prepare recording'),(self.batch_tab,'Batch preparation'),(self.guided_tab,'Guided review'),(self.review_tab,'Review samples'),(self.transcript_tab,'Transcript')]:self.tabs.add(page,text=name)
-        self.make_prepare();self.make_batch();self.make_review();self.make_guided();self.make_transcripts()
+        self.prepare_tab,self.batch_tab,self.guided_tab,self.review_tab,self.transcript_tab,self.compare_tab=[ttk.Frame(self.tabs,padding=10) for _ in range(6)]
+        for page,name in [(self.prepare_tab,'Prepare recording'),(self.batch_tab,'Batch preparation'),(self.guided_tab,'Guided review'),(self.review_tab,'Review samples'),(self.transcript_tab,'Transcript'),(self.compare_tab,'Compare reviewers')]:self.tabs.add(page,text=name)
+        self.make_prepare();self.make_batch();self.make_review();self.make_guided();self.make_transcripts();self.make_comparison()
         ttk.Label(box,textvariable=self.status,wraplength=1180).pack(fill='x',pady=(7,0))
         for key in ('speaker','valence','arousal','start','end'):self.vars[key].trace_add('write',self.mark_dirty)
         root.bind('<Escape>',lambda e:self.stop_audio())

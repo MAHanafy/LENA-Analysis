@@ -1,5 +1,9 @@
 # Change history
 
+## Version 2.3.0
+
+Reviewer comparison aligns annotations by time and handles shifted boundaries and split intervals. It reports disagreements, unknown values, approval differences, and descriptive agreement with its denominator. Selected differences link to the first review and exact audio spans. Checksums reject stale reports; exporting a comparison leaves both reviews unchanged.
+
 ## Version 2.2.0
 
 Timed transcript drafts can be imported from Whisper JSON, SRT, and VTT or generated locally with an optional speech component. Transcript segments link to exact playback ranges and overlapping annotation intervals. Checksums and timing validation protect against mismatched excerpts; replacement keeps a backup. Model downloads require explicit selection.
