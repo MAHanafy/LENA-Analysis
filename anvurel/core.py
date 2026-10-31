@@ -247,13 +247,43 @@ def approve(run, index, reviewer):
     log_event(run, 'approved', interval=index+1, reviewer=reviewer.strip(), signature=signature(rows[index]))
 
 def export(run):
-    run = Path(run)
+    """Publish a complete export only while its inputs remain unchanged."""
+    import transcript_export
+    run = Path(run).resolve()
+    watched = ('excerpt.wav', 'annotations.TextGrid', 'reviews.json', 'run.json', 'transcript.json')
+    def snapshot():
+        return {name: digest(run/name) if (run/name).exists() else None for name in watched}
+    before = snapshot()
     meta, rows, reviews = load_run(run)
     selected = [(i, row) for i, row in enumerate(rows) if valid(row) and signature(row) in reviews]
     if not selected:
         raise ValueError('No approved intervals. Complete labels and approve reviewed samples first.')
-    dest = run / ('export_' + uuid.uuid4().hex[:8])
-    dest.mkdir()
+    for _, row in selected:
+        record = reviews[signature(row)]
+        if not isinstance(record, dict) or not isinstance(record.get('reviewer'), str) or not record['reviewer'].strip() or not record.get('approved_utc'):
+            raise ValueError('An approval record is incomplete. Review and approve the interval again.')
+    transcript = transcript_export.prepare_export(run, selected)
+    key = uuid.uuid4().hex[:12]
+    pending = run / ('.export_' + key)
+    dest = run / ('export_' + key)
+    pending.mkdir(exist_ok=False)
+    try:
+        _write_export(run, pending, meta, rows, reviews, selected)
+        transcript_export.write_export(transcript, pending)
+        if snapshot() != before:
+            raise ValueError('Export inputs changed during processing. Reload and export again.')
+        pending.rename(dest)
+    finally:
+        if pending.exists():
+            # Cleanup is limited to the fresh directory made by this operation.
+            if pending.resolve().parent != run or pending.name != '.export_' + key:
+                raise RuntimeError('Unexpected export staging path; no cleanup was performed.')
+            shutil.rmtree(pending)
+    log_event(run, 'exported', export_folder=dest.name, samples=len(selected))
+    return dest
+
+
+def _write_export(run, dest, meta, rows, reviews, selected):
     manifest, counts = [], {}
     for i, row in selected:
         speaker, valence, arousal = (row[t] for t in TIERS)
@@ -286,8 +316,6 @@ def export(run):
     quality = automation.quality_metrics(run / 'excerpt.wav', rows)
     write_csv(dest / 'quality.csv', [dict(q,flags='; '.join(q['flags'])) for q in quality],
               ['interval','start','end','near_full_scale_fraction','rms_dbfs','flags'])
-    log_event(run, 'exported', export_folder=dest.name, samples=len(manifest))
-    return dest
 
 def log_event(run, action, **fields):
     with (Path(run) / 'activity.jsonl').open('a',encoding='utf-8') as f:

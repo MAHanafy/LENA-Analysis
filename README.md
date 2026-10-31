@@ -125,9 +125,9 @@ The checks cover configuration, recording discovery, interaction classification,
 
 ## ANVUREL annotation application
 
-ANVUREL means Assisted Naturalistic Vocal Utterance Review and Emotion Labeling. It prepares adult speech candidates, shows the evidence for CDS or ADS suggestions, and opens selected intervals in Praat. A researcher assigns valence and arousal and approves samples before export.
+ANVUREL means Assisted Naturalistic Vocal Utterance Review and Emotion Labeling. Its guided screen presents one candidate at a time, with draft recovery and explicit approval. Timed transcripts connect text to audio, and reviewer comparison lists disagreements between independent annotations. A researcher assigns valence and arousal before exporting approved clips.
 
-![ANVUREL review interface with synthetic audio and example labels](anvurel/docs/images/review.jpg)
+![ANVUREL review interface with synthetic audio and example labels](anvurel/docs/images/guided.jpg)
 
 This screenshot uses generated tones and artificial metadata. The labels demonstrate the interface.
 

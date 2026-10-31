@@ -2,7 +2,7 @@
 
 Assisted Naturalistic Vocal Utterance Review and Emotion Labeling
 
-Version 2.3.0
+Version 2.4.0
 
 ANVUREL is a Windows desktop application for annotating adult speech in LENA recordings. It prepares audio excerpts, imports adult segments from ITS metadata, and creates a Praat TextGrid. A researcher checks the boundaries and labels before exporting clips.
 
@@ -56,6 +56,8 @@ Progress is saved after every excerpt in `batch.json` and `batch_report.csv`. **
 If a source file changes, create a new batch. When a completed run is missing, its status becomes `needs_check` so an existing review is not silently replaced. Recursive scanning skips generated outputs, Python environments, and symbolic links.
 
 ## Guided review
+
+![Guided review with synthetic audio, draft text, large label buttons, and approval controls](docs/images/guided.jpg)
 
 Prepared runs open in **Guided review**. This screen presents one candidate with large buttons for speaker, listener, valence, and arousal. **Review list** opens the detailed table when you need to inspect several intervals.
 
@@ -117,6 +119,8 @@ In Praat, Shift plus drag moves boundaries that share a time across tiers. The a
 
 ## Timed transcripts
 
+![Transcript import and local generation controls with artificial timed example text](docs/images/transcript.jpg)
+
 The **Transcript** tab imports JSON from Whisper, SRT, or VTT. Choose whether the times refer to the excerpt or the original recording before importing. Original times are converted using the excerpt's source offset. Cues crossing an excerpt boundary are clipped and flagged for checking.
 
 Select a text segment and click **Play text segment** to hear that exact span. **Show matching annotation** selects the candidate with the greatest overlap. Text overlapping the current candidate also appears in Guided review. A cue that covers several intervals can appear for each of them; it does not establish a word boundary.
@@ -128,6 +132,8 @@ Generation runs in the background and can be stopped after the current model or 
 Transcript text remains a draft. Listen to confirm its words and timing. Import and generation leave the speaker, emotion, and approval labels unchanged.
 
 ## Compare reviewers
+
+![Comparison of two artificial reviews with a deliberate valence disagreement and shifted boundary](docs/images/comparison.jpg)
 
 Use separate copies of a prepared run for independent annotation. In **Compare reviewers**, select the two review folders and click **Compare reviews**. The excerpts must have identical audio checksums, source offsets, durations, and groups. Comparing a folder with itself is rejected.
 
@@ -181,6 +187,14 @@ By default, runs are saved under `outputs/anvurel/automation_runs` in the reposi
 Click **Export approved** after reviewing the intervals you want to use. Each export is written to a new folder. It contains the approved clips, reviewed TextGrid and excerpt, timestamps on the original and excerpt timelines, review and suggestion records, and coverage counts. Acoustic measurements use the approved boundaries. Quality flags are recalculated from the current TextGrid.
 
 Coverage includes 16 combinations of speaker class, speech type, positive or negative valence, and arousal. Eight further combinations use neutral valence. Categories with no approved clips have a count of zero. The source WAV and ITS files are left unchanged.
+
+When a valid transcript is attached, the export includes its excerpt snapshot in `transcript.json` and clip mappings in `transcript_segments.csv`. Mappings contain excerpt, original recording, and clip times at the actual audio sample boundaries. Full cue text is retained; `partial_cue` identifies text whose complete cue does not fit inside that clip. A cue crossing several clips does not establish which words belong to each one.
+
+Exports are prepared in a temporary folder. The final export appears after all files are written and the input checksums still match. A failed write or changed input removes the incomplete output and leaves the reviewed source files in place.
+
+## Pilot checks
+
+The automated checks cover draft recovery, approval undo, playback speed and pitch, transcript offsets, comparison with deliberate disagreements, and the complete preparation to export workflow. They also check a 1000 by 700 window and reject stale audio or annotations. Local speech recognition has been exercised on a five minute recording. These checks establish software behavior; transcript accuracy, annotation agreement, and time savings still require assessment by researchers.
 
 ## Working with a team
 

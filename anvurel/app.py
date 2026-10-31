@@ -67,7 +67,10 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
         self.cancel.set()
         if self.busy:
             self.closing=True;self.status.set('Finishing the current excerpt before closing. Batch progress will be saved.');return
-        self.cancel_autosave();self.autosave_form();self.stop_audio()
+        self.cancel_autosave()
+        if not self.autosave_form():
+            messagebox.showinfo('Unsaved form','Correct the boundary times or reset the form before closing.');return
+        self.stop_audio()
         for pending in self.root.tk.call('after','info'):
             self.root.after_cancel(pending)
         self.root.destroy()
@@ -260,9 +263,14 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
 
     def load_run(self,path):
         if self._transcript_operation is not None and self.busy:raise ValueError('Stop transcription and wait for it to finish before switching runs.')
-        if self.praat_active() and self.run!=Path(path).resolve():raise ValueError('Finish Praat before switching runs.')
-        self.cancel_autosave();self.autosave_form();self.stop_audio();self.undo_tokens=[]
-        self.run=Path(path).resolve();self.dirty=False;self.focused_index=None;self.reload_impl();self.tabs.select(self.guided_tab);self.draft_notice()
+        candidate=Path(path).resolve()
+        if self.praat_active():raise ValueError('Finish Praat before loading a run.')
+        core.load_run(candidate)
+        self.cancel_autosave()
+        if not self.autosave_form():raise ValueError('Save or reset the current form before switching runs.')
+        self.stop_audio()
+        if self.run!=candidate:self.undo_tokens=[]
+        self.run=candidate;self.dirty=False;self.focused_index=None;self.reload_impl();self.tabs.select(self.guided_tab);self.draft_notice()
 
     def reload(self):
         self.cancel_autosave()

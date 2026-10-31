@@ -1,5 +1,11 @@
 # Change history
 
+## Version 2.4.0
+
+The complete pilot workflow connects preparation, guided review, timed transcripts, reviewer comparison, and approved export. Exports include draft transcript snapshots and clip mappings at audio sample boundaries. A final input checksum check and temporary output folder prevent incomplete exports from appearing as completed work.
+
+The guided screen keeps approval and recovery controls visible on smaller windows. Invalid run selection or an unsavable form leaves the current review in place. Integration checks cover intentional reviewer disagreements, exact audio and transcript timing, changed inputs, and failed output writes.
+
 ## Version 2.3.0
 
 Reviewer comparison aligns annotations by time and handles shifted boundaries and split intervals. It reports disagreements, unknown values, approval differences, and descriptive agreement with its denominator. Selected differences link to the first review and exact audio spans. Checksums reject stale reports; exporting a comparison leaves both reviews unchanged.

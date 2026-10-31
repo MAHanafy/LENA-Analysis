@@ -33,10 +33,17 @@ class GuidedDesktopTests(Fixture):
         self.tk.update()
 
     def tearDown(self):
-        self.application.close()
-        self.error_patch.stop()
-        self.sound_patch.stop()
-        super().tearDown()
+        try:
+            self.application.dirty = False
+            self.application.close()
+        finally:
+            try:
+                self.tk.destroy()
+            except tk.TclError:
+                pass
+            self.error_patch.stop()
+            self.sound_patch.stop()
+            super().tearDown()
 
     def complete_form(self):
         a = self.application

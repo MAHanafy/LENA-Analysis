@@ -17,7 +17,23 @@ class GuidedReviewMixin:
         self.undo_tokens = []
 
     def make_guided(self):
-        page = self.guided_tab
+        footer = self.guided_footer = ttk.Frame(self.guided_tab)
+        footer.pack(side='bottom', fill='x', pady=(5,0))
+        container = ttk.Frame(self.guided_tab); container.pack(fill='both', expand=True)
+        scroll = self.guided_scroll = tk.Canvas(container, highlightthickness=0, borderwidth=0)
+        bar = ttk.Scrollbar(container, orient='vertical', command=scroll.yview)
+        bar.pack(side='right', fill='y'); scroll.pack(side='left', fill='both', expand=True)
+        scroll.configure(yscrollcommand=bar.set)
+        page = ttk.Frame(scroll)
+        window = scroll.create_window((0,0), window=page, anchor='nw')
+        page.bind('<Configure>', lambda event:scroll.configure(scrollregion=scroll.bbox('all')))
+        self.guided_wrapped = []
+        def resize(event):
+            scroll.itemconfigure(window, width=event.width)
+            for label in self.guided_wrapped:label.configure(wraplength=max(240,event.width-20))
+            if hasattr(self,'guided_recovery_label'):
+                self.guided_recovery_label.configure(wraplength=max(200,event.width-310))
+        scroll.bind('<Configure>', resize)
         ttk.Label(page, text='Listen, label, then approve', font=('Segoe UI', 16, 'bold')).pack(anchor='w')
         ttk.Label(page, textvariable=self.review_progress).pack(anchor='w', pady=(2, 6))
         self.button_bar(page, [('Load run', self.choose_run), ('Previous', lambda:self.guided_next(-1)),
@@ -35,8 +51,9 @@ class GuidedReviewMixin:
         self.guided_canvas.bind('<Configure>', self.redraw_selection)
         self.canvas.bind('<Configure>', self.redraw_selection)
         ttk.Label(page, textvariable=self.detail).pack(anchor='w')
-        ttk.Label(page, textvariable=self.evidence, wraplength=1120).pack(anchor='w', pady=5)
-        ttk.Label(page, textvariable=self.transcript_preview, wraplength=1120).pack(anchor='w', pady=(0,4))
+        for variable in (self.evidence,self.transcript_preview):
+            label=ttk.Label(page,textvariable=variable,wraplength=900)
+            label.pack(anchor='w',pady=3);self.guided_wrapped.append(label)
         choices = [('Speaker and listener', 'speaker', [('FAN to child','FAN-CDS'),('FAN to adult','FAN-ADS'),
             ('MAN to child','MAN-CDS'),('MAN to adult','MAN-ADS'),('FAN ?','FAN-?'),('MAN ?','MAN-?'),('Unknown','?')]),
             ('Valence', 'valence', [('Positive','+1'),('Neutral','0'),('Negative','-1'),('Unknown','?')]),
@@ -52,16 +69,23 @@ class GuidedReviewMixin:
             ttk.Label(bounds, text=title).pack(side='left', padx=(0, 5))
             ttk.Entry(bounds, textvariable=self.vars[key], width=12).pack(side='left', padx=(0, 12))
         ttk.Button(bounds, text='Apply boundaries', command=self.boundaries).pack(side='left')
-        ttk.Label(bounds, text='Reviewer ID').pack(side='left', padx=(20, 5))
-        ttk.Entry(bounds, textvariable=self.vars['reviewer'], width=18).pack(side='left')
-        self.button_bar(page, [('Save labels', self.save_labels), ('Approve and next', self.approve_next),
+        identity=ttk.Frame(footer);identity.pack(fill='x')
+        ttk.Label(identity,text='Reviewer ID').pack(side='left',padx=(0,6))
+        ttk.Entry(identity,textvariable=self.vars['reviewer'],width=18).pack(side='left')
+        self.button_bar(footer, [('Save labels', self.save_labels), ('Next', self.guided_next), ('Approve and next', self.approve_next),
             ('Exclude interval', self.exclude), ('Undo last change', self.undo_change), ('Export approved', self.export)])
-        recovery = ttk.Frame(page); recovery.pack(fill='x', pady=4)
+        recovery = ttk.Frame(footer); recovery.pack(fill='x', pady=4)
         ttk.Button(recovery, text='Restore saved form', command=self.restore_form).pack(side='left', padx=(0, 6))
         ttk.Button(recovery, text='Reset form', command=self.reset_form).pack(side='left')
-        ttk.Label(recovery, textvariable=self.draft_status, wraplength=850).pack(side='left', padx=12)
-        ttk.Label(page, text='FAN and MAN are LENA speaker classes. Follow your study protocol for emotion labels.\nNext saves valid form changes without approval. Ctrl+Enter approves; F5 plays context; Escape stops audio.',
-                  wraplength=1100).pack(anchor='w', pady=4)
+        self.guided_recovery_label=ttk.Label(recovery,textvariable=self.draft_status,wraplength=600)
+        self.guided_recovery_label.pack(side='left',padx=12)
+        help_label=ttk.Label(page, text='FAN and MAN are LENA speaker classes. Follow your study protocol for emotion labels.\nNext saves valid form changes without approval. Ctrl+Enter approves; F5 plays context; Escape stops audio.',wraplength=900)
+        help_label.pack(anchor='w',pady=4);self.guided_wrapped.append(help_label)
+        def bind_scroll(widget):
+            if not isinstance(widget,(ttk.Entry,ttk.Combobox)):
+                widget.bind('<MouseWheel>',lambda event:scroll.yview_scroll(-int(event.delta/120),'units'),add='+')
+            for child in widget.winfo_children():bind_scroll(child)
+        bind_scroll(page)
 
     def redraw_selection(self, event=None):
         if self.run and self.focused_index is not None and self.focused_index < len(self.rows):
@@ -81,13 +105,15 @@ class GuidedReviewMixin:
     def autosave_form(self):
         self.autosave_after = None
         if not self.run or not self.dirty or self.focused_index is None or self.praat_active():
-            return
+            return True
         try:
             values = {key:self.vars[key].get() for key in ('speaker','valence','arousal','start','end')}
             review_tools.save_draft(self.run, self.focused_index, values, self.vars['reviewer'].get(), self.grid_hash)
             self.draft_status.set('Recovery form saved. Labels still need explicit saving or approval.')
+            return True
         except (ValueError, OSError) as error:
             self.draft_status.set('Recovery form not saved: ' + str(error))
+            return False
 
     def draft_notice(self):
         try:

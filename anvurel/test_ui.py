@@ -17,7 +17,13 @@ class DesktopTests(Fixture):
         self.tk.report_callback_exception=lambda *e:self.errors.append(e)
         self.application.load_run(self.run);self.tk.update()
     def tearDown(self):
-        self.application.close();super().tearDown()
+        try:
+            self.application.dirty=False
+            self.application.close()
+        finally:
+            try:self.tk.destroy()
+            except tk.TclError:pass
+            super().tearDown()
     def test_save_approve_next_and_filter(self):
         a=self.application
         a.vars['speaker'].set('FAN-CDS');a.vars['valence'].set('+1');a.vars['arousal'].set('-1');a.vars['reviewer'].set('test_rater')
