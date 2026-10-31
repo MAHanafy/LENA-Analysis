@@ -1,158 +1,142 @@
 # LENA Acoustic and Interaction Analysis
 
-This MATLAB project analyzes paired LENA `.ITS` and `.WAV` recordings. It extracts AICM speech segments, classifies directed interactions, calculates acoustic features, saves recording-level files, and creates one merged workbook per subject.
+This repository contains a MATLAB analysis pipeline and the ANVUREL annotation application. Both work with paired LENA ITS and WAV recordings.
 
-The code was reorganized from the historical monolithic script into a small package. The current pipeline also adds semitone F0 range, estimated dB SPL, loudness-variability metrics, explicit date parsing, and empty-session diagnostics.
+| Component | Purpose |
+| --- | --- |
+| [MATLAB pipeline](#run-the-analysis) | Extract AICM speech segments, classify directed interactions, calculate acoustic features, and merge recording results by subject |
+| [ANVUREL](anvurel/README.md) | Prepare draft annotations, review them in Praat, and export approved adult speech clips |
 
-## Requirements
+## MATLAB requirements
 
-- MATLAB R2025b or a compatible release
-- Paired `.ITS` and `.WAV` files with the same filename stem
-- `shrp.m` on the MATLAB path (included in this repository)
-- `Name_Correspondences.xlsx` for Session ID lookup
+Use MATLAB R2025b or a compatible release. Each ITS file needs a WAV file with the same filename stem. The pitch analysis uses `shrp.m`, which is included in the repository. Session ID lookup requires `Name_Correspondences.xlsx`.
 
 ## Run the analysis
 
-Open MATLAB in this repository and run:
+Open MATLAB in the repository folder and run:
 
 ```matlab
 run_lena_analysis
 ```
 
-A folder-selection window opens. Select a subject folder, a cohort folder such as `HA` or `CI`, or the common `Cougar_union` folder.
+A folder selection window opens. Choose a subject folder, a cohort folder such as `HA` or `CI`, or a common parent folder containing those groups.
 
-For a scripted run, pass the folder directly:
+You can also pass a path directly. Replace the example below with the location of your recordings:
 
 ```matlab
-run_lena_analysis('F:\SynologyDrive\Cougar_union\HA')
+run_lena_analysis(fullfile('data', 'HA'))
 ```
 
-The historical command is still supported:
+The earlier entry point remains available:
 
 ```matlab
 acoust_detail_funcs_newhelpers_MH
 ```
 
-## Project organization
+## Project structure
 
-```text
-LENA/
-├── run_lena_analysis.m
-├── README.md
-├── +lena/
-│   ├── config.m
-│   ├── find_recordings.m
-│   ├── process_recording.m
-│   ├── classify_interactions.m
-│   ├── analyze_acoustics.m
-│   ├── save_results.m
-│   └── create_plots.m
-├── legacy/
-│   └── acoust_detail_funcs_original.m
-└── tests/
-    ├── test_lena_pipeline.m
-    └── fixtures/
-```
-
-Responsibilities are intentionally broad so the project remains compact:
-
-- `config.m`: paths, calibration, and all numeric/classifier parameters
-- `find_recordings.m`: recursive ITS discovery and recording metadata
-- `process_recording.m`: ITS reading, interval parsing, and per-recording orchestration
-- `classify_interactions.m`: v3 turn-pair classification and empty-session diagnostic counts
-- `analyze_acoustics.m`: F0, semitone F0 range, dBFS, estimated dBSPL, loudness variability, syllable calculations, and their local calculation helpers
-- `save_results.m`: recording-level exports plus one final subject-level workbook merge and date-safe CSV import
-- `create_plots.m`: evaluation and classifier-comparison plots
-- `legacy/acoust_detail_funcs_original.m`: frozen pre-refactor implementation for reference
+| File or folder | Responsibility |
+| --- | --- |
+| `run_lena_analysis.m` | Start the analysis |
+| `+lena/config.m` | Define paths, calibration values, and classifier parameters |
+| `+lena/find_recordings.m` | Find ITS recordings and read filename metadata |
+| `+lena/process_recording.m` | Read ITS data and coordinate analysis for one recording |
+| `+lena/classify_interactions.m` | Classify turn pairs and count diagnostic events |
+| `+lena/analyze_acoustics.m` | Calculate pitch, level, loudness variability, and syllable measures |
+| `+lena/save_results.m` | Export recording results and merge subject workbooks |
+| `+lena/create_plots.m` | Create evaluation and comparison plots |
+| `legacy/acoust_detail_funcs_original.m` | Preserve the original script for reference |
+| `tests/test_lena_pipeline.m` | Run the MATLAB regression checks |
+| `anvurel/` | Provide the Windows annotation interface and its Python checks |
 
 ## Acoustic measurements
 
-Each analyzed segment can include:
+Each analyzed segment can contain these measures:
 
-- `f0mean`, `f0std`, `f0min`, `f0max`, and `f0range` in Hz
-- `f0rangeST`, calculated as `12 * log2(f0max / f0min)` when both values are positive
-- `dBFS`, calculated from the RMS amplitude of the segment
-- `dBSPL`, estimated as `dBFS + cfg.dBSPLCalibrationOffset`; the default is 97 dB and should be confirmed against the recorder calibration before interpreting it as calibrated SPL
-- `loudnessStd`, the standard deviation of valid frame-level dBFS values
-- `loudnessRange`, the maximum minus minimum valid frame-level dBFS value
-- `loudnessIQR`, the 75th minus 25th percentile of valid frame-level dBFS values
-- `pctUttVx`, `syllableCount`, and `syllablesPerSec`
+| Fields | Meaning |
+| --- | --- |
+| `f0mean`, `f0std`, `f0min`, `f0max`, `f0range` | F0 statistics in Hz |
+| `f0rangeST` | F0 range in semitones, calculated as `12 * log2(f0max / f0min)` when both values are positive |
+| `dBFS` | Digital level calculated from the segment's RMS amplitude |
+| `dBSPL` | Estimated level calculated as `dBFS + cfg.dBSPLCalibrationOffset` |
+| `loudnessStd` | Standard deviation of valid frame dBFS values |
+| `loudnessRange` | Maximum minus minimum valid frame dBFS |
+| `loudnessIQR` | The 75th minus 25th percentile of valid frame dBFS |
+| `pctUttVx`, `syllableCount`, `syllablesPerSec` | Voicing and syllable measures |
 
-Loudness coefficient of variation is intentionally not calculated because its interpretation on logarithmic dB values requires additional validation.
+The default dB SPL calibration offset is 97 dB. Confirm it against the recorder calibration before treating the estimate as calibrated sound pressure. Loudness coefficient of variation is omitted because its interpretation on logarithmic dB values needs further validation.
 
 ## Outputs
 
-Outputs retain the established folder hierarchy and filenames while adding the new acoustic columns and diagnostic file:
+Results are grouped by analysis date, cohort, subject, and recording:
 
 ```text
 results_YYYYMMDD/
-└── cohort/
-    └── subject/
-        ├── subject_AICM_INTERACTIONS_All_Recordings.xlsx
-        └── recording/
-            ├── *_CHN.mat
-            ├── *_CHN2FAN.mat
-            ├── *_CHN2MAN.mat
-            ├── *_FAN.mat
-            ├── *_MAN.mat
-            ├── *_AICM_INTERACTIONS.mat
-            ├── *_AICM_INTERACTIONS.csv
-            ├── *_AICM_INTERACTIONS_All_Segments.csv
-            ├── *_EMPTY_SESSION_DIAGNOSTIC.csv
-            └── evaluation/comparison plots
+    cohort/
+        subject/
+            subject_AICM_INTERACTIONS_All_Recordings.xlsx
+            recording/
+                *_CHN.mat
+                *_CHN2FAN.mat
+                *_CHN2MAN.mat
+                *_FAN.mat
+                *_MAN.mat
+                *_AICM_INTERACTIONS.mat
+                *_AICM_INTERACTIONS.csv
+                *_AICM_INTERACTIONS_All_Segments.csv
+                *_EMPTY_SESSION_DIAGNOSTIC.csv
 ```
 
-The first four interaction CSV columns are `file name`, `subject name`, `Session ID`, and `Date`. Date values are explicitly imported and exported using `M/d/yyyy` without a time.
+Evaluation and comparison plots are also saved for each recording. The first four interaction CSV columns are `file name`, `subject name`, `Session ID`, and `Date`. Dates use `M/d/yyyy` without a time component.
 
-The merged subject workbook is named `*_AICM_INTERACTIONS_All_Recordings.xlsx`. It contains one `All_Segments` sheet with all exported segment rows from completed recording CSV files. Loudness summary sheets are intentionally not generated; comparisons across speakers or interaction types should be calculated from the segment-level columns.
+Each subject workbook contains one `All_Segments` sheet combining the exported rows from completed recordings. The workbook is created when that subject's final selected recording finishes. To compare speakers or interaction types, calculate summaries from the segment columns; separate loudness summary sheets are not generated.
 
-When no interactions are produced, `*_EMPTY_SESSION_DIAGNOSTIC.csv` reports the number of AICM conversations, candidate and accepted segments, immediate-neighbor rejections, valid speech segments, interaction pairs, output rows, and a plain-language reason.
-
-The AM28 age vector remains active only when the selected folder itself is named `AM28`. Other subject/cohort selections retain `NaN` in the legacy age fields.
+When an analysis produces no interactions, `*_EMPTY_SESSION_DIAGNOSTIC.csv` reports conversation and segment counts, rejected neighbors, accepted pairs, output rows, and a reason. The AM28 age vector is used only when the selected folder itself is named `AM28`. Other selections retain `NaN` in the legacy age fields.
 
 ## Configuration
 
-Edit [+lena/config.m](+lena/config.m) to change the default data folder or correspondence workbook. Algorithm parameters are centralized there but retain their pre-refactor values.
+Edit [`+lena/config.m`](+lena/config.m) to set the default recording folder or correspondence workbook. The file also holds the algorithm parameters. Those values retain the settings used before the code was reorganized.
 
-The estimated dB SPL calibration offset defaults to 97 dB and can be changed after calibration review:
+To set the estimated dB SPL offset after a calibration review:
 
 ```matlab
 cfg = lena.config();
 cfg.dBSPLCalibrationOffset = 97;
 ```
 
-Each subject workbook is created as soon as that subject's final selected recording finishes, rather than waiting for the entire analysis run or rebuilding it after every recording.
-
-To disable plots for a controlled/test run:
+To run without plots:
 
 ```matlab
 cfg = lena.config();
 cfg.createPlots = false;
-run_lena_analysis('F:\path\to\data', cfg);
+run_lena_analysis(fullfile('data', 'HA'), cfg);
 ```
 
-## Tests
+## MATLAB checks
 
-Run the regression tests from MATLAB:
+Run the regression checks from MATLAB:
 
 ```matlab
 results = runtests('tests/test_lena_pipeline.m');
 assertSuccess(results)
 ```
 
-The tests cover configuration values, old/new recording-name discovery, interaction classification, empty-session diagnostics, acoustic conversions, loudness variability, grouped summaries, unambiguous date import, empty output schemas, and the historical compatibility entry point.
+The checks cover configuration, recording discovery, interaction classification, acoustic conversions, loudness variability, grouped summaries, date import, empty outputs, and the earlier entry point.
 
+## ANVUREL annotation application
 
-## ANVUREL annotation assistant
+ANVUREL means Assisted Naturalistic Vocal Utterance Review and Emotion Labeling. It prepares adult speech candidates, shows the evidence for CDS or ADS suggestions, and opens selected intervals in Praat. A researcher assigns valence and arousal and approves samples before export.
 
-ANVUREL (Assisted Naturalistic Vocal Utterance Review and Emotion Labeling) provides a local Windows interface for batch preparation, explained CDS/ADS suggestions, Praat review, and approved sample extraction. Valence and arousal remain human-reviewed labels.
+![ANVUREL review interface with synthetic audio and example labels](anvurel/docs/images/review.jpg)
 
-See [application instructions](anvurel/README.md) and [change history](anvurel/CHANGELOG.md). On Windows, install Python 3.12 with Tcl/Tk, run `anvurel/setup.cmd`, and then launch `anvurel/start.cmd`. Praat setup is described in the application instructions.
+This screenshot uses generated tones and artificial metadata. The labels demonstrate the interface.
 
-Run the application checks with:
+The [application guide](anvurel/README.md) includes installation steps, workflow screenshots, annotation rules, and output descriptions. Install Python 3.12 with Tcl/Tk and the Python launcher, run `setup.cmd` inside `anvurel`, then open `start.cmd`. The guide explains how to obtain and select Praat.
+
+Run the application checks from the repository folder:
 
 ```powershell
 anvurel\.venv\Scripts\python.exe -m unittest discover -s anvurel -p "test_*.py" -v
 ```
 
-Research recordings, participant materials, generated results, local environments, and Praat binaries are excluded from the source upload.
+See the [change history](anvurel/CHANGELOG.md) for version details. Recordings, participant materials, generated outputs, Python environments, and Praat binaries are excluded from the application source package.

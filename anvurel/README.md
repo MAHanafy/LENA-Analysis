@@ -1,109 +1,177 @@
 # ANVUREL
 
-**Assisted Naturalistic Vocal Utterance Review and Emotion Labeling**
+Assisted Naturalistic Vocal Utterance Review and Emotion Labeling
 
 Version 2.0.1
 
-Local Windows software for preparing, reviewing, and exporting adult speech samples from LENA recordings. This release implements the next four automation steps: batch preparation, pause refinement, explained CDS/ADS suggestions, and faster Praat review. It does not yet predict valence or arousal.
+ANVUREL is a Windows desktop application for annotating adult speech in LENA recordings. It prepares audio excerpts, imports adult segments from ITS metadata, and creates a Praat TextGrid. A researcher checks the boundaries and labels before exporting clips.
 
-## Start on this computer
+The application can process folders, suggest CDS or ADS labels from conversation metadata, and measure basic acoustic features. Valence and arousal are assigned by the reviewer. Audio processing runs locally.
 
-The project is now at `D:\Projects\LENA`.
+The screenshots below show generated tones and artificial ITS metadata. Their labels illustrate the controls and have no research interpretation.
 
-- Double-click `anvurel\start_pilot.cmd` to open the latest prepared real NH excerpt.
-- Double-click `anvurel\start.cmd` for the application without a selected run.
-- Existing pilot runs remain readable and are not overwritten.
+## Installation
 
-## Prepare one recording
+1. Download the [ANVUREL branch](https://github.com/MAHanafy/LENA-Analysis/archive/refs/heads/anvurel.zip) or clone the repository and select the `anvurel` branch. Extract the archive before running the application.
+2. Install Python 3.12 with Tcl/Tk, pip, and the Python launcher. The [Python installation guide for Windows](https://docs.python.org/3.12/using/windows.html) describes these components.
+3. Open the `anvurel` folder and run `setup.cmd`. It creates a local `.venv` folder and installs the packages listed in `requirements.txt`. This step needs internet access.
+4. Download [Praat for Windows](https://www.fon.hum.uva.nl/praat/download_win.html). Extract `Praat.exe` and either place it in `anvurel/tools` or select its location in the application.
+5. Run `start.cmd` from the `anvurel` folder.
 
-1. In **Prepare recording**, choose a PCM WAV. A matching sibling ITS file is filled automatically when present.
-2. Select **Auto**, **NH**, **HA**, or **Reference**. Auto infers NH/HA only from an exact parent folder name; otherwise it uses Reference. Check the group before using results.
-3. Set the start and excerpt duration in seconds. The default is 300 seconds; the maximum is one hour. Only the excerpt is loaded into memory.
-4. Leave **Refine adult boundaries using Praat pauses** enabled to propose splits at pauses and trim quiet edges inside imported adult segments. Disable it to keep the original ITS segment boundaries.
-5. Leave **Suggest CDS/ADS** enabled to fill supported draft labels and retain evidence. Click **Prepare draft**.
+The standalone Praat program is used for manual editing. Preparation and acoustic analysis use the Praat engine supplied by Parselmouth. Each computer needs its own Python environment; run `setup.cmd` on that computer rather than copying an existing `.venv` folder.
 
-The WAV and ITS filenames must have matching stems. ITS elapsed times are assumed to align with the WAV. Verify alignment by listening; matching filenames alone do not establish synchronization.
+## Prepare a recording
 
-## Prepare a folder and resume work
+Start with a short excerpt so you can check its timing and labels before processing a larger collection.
 
-1. In **Batch preparation**, choose a recording folder and an output folder. **Scan folder** lists WAV files, detected groups, missing ITS pairs, and header errors.
-2. Choose **first** for the first excerpt of each recording or **all** for every consecutive chunk. First is the default, so a daylong folder does not automatically generate thousands of excerpts.
-3. Select the excerpt length and group override. Refinement and suggestion options come from **Prepare recording**.
-4. Click **Prepare batch**. Progress and errors are saved in `batch.json` and `batch_report.csv` after every excerpt. One failed recording does not stop other jobs.
-5. **Stop after current excerpt** saves completed work. **Resume batch** opens that batch folder and retries unfinished or failed jobs. Completed runs are skipped, preserving their annotations and approvals. Source changes require a new batch. A missing completed run is marked `needs_check` rather than silently replacing reviewed work.
-6. Select a completed row and click **Open selected run**.
+![Prepare recording tab with a synthetic WAV, paired ITS file, output folder, and preparation settings](docs/images/prepare.jpg)
 
-Generated output directories, virtual environments, and symlinks are excluded from recursive discovery. A queue lock prevents two workers from processing the same batch. Use separate run folders for independent raters. This is not yet a simultaneous multiuser database or browser application.
+The **Prepare recording** tab specifies the input, output, excerpt duration, and draft annotation options.
 
-## What the CDS and ADS suggestions mean
+1. Choose an uncompressed PCM WAV file. The application fills the ITS field when it finds a file with the same name and an `.its` extension beside the WAV. You can also select the ITS file yourself.
+2. Choose a group. **Auto** looks for an exact `NH` or `HA` folder name in the recording's parent path. If neither is present, it uses **Reference**. Check that the selected group matches your study.
+3. Enter the start time and excerpt duration in seconds. The default duration is 300 seconds. Excerpts can be up to 3,600 seconds long, and only the selected excerpt is loaded into memory.
+4. Keep **Refine adult boundaries using Praat pauses** selected to split imported adult segments at pauses and trim quiet edges. Clear it to retain the ITS segment boundaries.
+5. Keep **Suggest CDS/ADS** selected if you want draft labels from the conversation rules. Click **Prepare draft**.
 
-The rules adapt the existing `+lena/classify_interactions.m` workflow:
+Matching WAV and ITS filenames are required, but do not establish that the files are synchronized. Listen to several intervals and check their timing. The ITS timestamps are interpreted on the original WAV timeline.
 
-- Read CHN utterance timestamps, FAN/MAN segments, conversation boundaries, word counts, and turn codes.
-- Consider nearby valid turns within five seconds in the same conversation; prefer recognized LENA turn codes over a timing fallback.
-- Propose CDS for supported adult-child pairs and ADS for supported pairs between different adult speaker classes.
-- Retain the pair, gap, and rule source in `suggestions.json` and display them during review.
+You can prepare audio without an ITS file. In that case, sounding regions become candidates and speaker identity remains unknown. Noise, television, and child vocalizations may appear among those regions.
 
-Two deliberate differences from the MATLAB extraction scope are documented: this app considers all conversation types rather than only AICM, and it leaves conflicting CDS/ADS evidence unknown. Same-class FAN-to-FAN or MAN-to-MAN turns also stay unknown because speaker classes do not identify different individuals. The lower-level `interaction_suggestions(..., aicm_only=True)` option supports AICM-only comparisons.
+## Prepare a folder
 
-These are heuristic suggestions, not calibrated confidence scores or verified intended listeners. Missing evidence remains `FAN-?` or `MAN-?`. Overlapping adult segments remain visible with unknown labels and an overlap flag. No CDS/ADS prediction can be exported as approved without explicit reviewer action.
+![Batch preparation tab showing completed excerpts from synthetic recordings](docs/images/batch.jpg)
 
-## Review quickly
+The batch table lists each recording or excerpt, its group, and the preparation status.
 
-**Review samples** shows candidate intervals, waveform context, initial rule evidence, and flags for uncertainty, short duration, very quiet audio, possible clipping, and known overlap.
+1. Open **Batch preparation** and choose the recording folder and output folder.
+2. Click **Scan folder**. Review the WAV files, detected groups, missing ITS pairs, and any header errors.
+3. Set **Excerpts** to **first** for the first excerpt of each recording, or **all** for consecutive excerpts covering every recording. The default is **first**.
+4. Choose the excerpt duration and group override. The refinement and CDS/ADS options are shared with **Prepare recording**.
+5. Click **Prepare batch**. A failed recording is reported while other jobs continue.
+6. Select a completed row and click **Open selected run** to review it.
 
-- Filter **Needs review**, **Flagged first**, **All**, or **Approved**.
-- **F5** plays the selected interval with one second of context on either side.
-- **Ctrl+S** saves labels with a backup of the previous TextGrid.
-- **Ctrl+Enter** saves, approves under the entered reviewer ID, and selects the next candidate.
-- **Ctrl+Left / Ctrl+Right** navigates. Enable **Play after Next** if desired.
-- Enter exact start/end seconds and click **Apply boundaries to all tiers**. This also saves the current form labels. Shared neighboring boundaries move together; swallowing another interval is rejected.
-- **Exclude selected** clears that interval's labels, retaining the audio and a TextGrid backup.
+Progress is saved after every excerpt in `batch.json` and `batch_report.csv`. **Stop after current excerpt** lets the current job finish. Use **Resume batch** later and select the folder containing `batch.json`; completed jobs are skipped.
 
-Unknown labels cannot be approved. Every approval identifies the exact interval and labels; changing those invalidates the matching approval. Unsaved form edits are retained when an external file changes. Reload explicitly discards those unsaved form edits. Prior TextGrids are available in `history`.
+If a source file changes, create a new batch. When a completed run is missing, its status becomes `needs_check` so an existing review is not silently replaced. Recursive scanning skips generated outputs, Python environments, and symbolic links.
 
-## Praat connection
+## Review the draft
 
-1. Save and close any other Praat application instance before starting app-controlled review. This avoids ambiguous interprocess messages.
-2. Select a candidate and click **Open selection in Praat** or press **F6**. The app opens a dedicated editor with the Sound and TextGrid already selected and zoomed to the interval.
-3. Correct boundaries or labels. While the session is open, app editing, approval, and export are blocked to prevent a stale editor from overwriting newer annotations. Next/Previous can navigate the active editor.
-4. Click **Finish and save Praat** to save the dedicated TextGrid, close that session, and reload the app. You can also save and close Praat manually. Do not close the app while leaving an unsaved Praat review open.
-5. **Auto reload saved TextGrid** detects external saves. If tier boundaries differ, **Align to speaker tier** rebuilds valence/arousal intervals using speaker-tier boundaries. Unambiguous overlapping labels are retained; conflicting labels become `?`. A backup is kept. In Praat, Shift-drag moves boundaries that share a time across tiers together.
+![Review samples tab with synthetic intervals, a selected waveform, labels, reviewer ID, and approval controls](docs/images/review.jpg)
 
-The integration uses Praat scripts and `--send` commands, not mouse-position automation. On Windows it needs an ordinary desktop session; restricted sandboxes may block interprocess messages. Another Praat instance opened during review must be closed before automated navigation or finishing. The app never closes an unrelated Praat session.
+Select an interval in **Review samples**. The waveform shows its boundaries and nearby context. Below it, the application displays the rule behind the initial CDS or ADS suggestion.
 
-## Segmentation and measurements
+Listen, adjust the boundaries if needed, and enter the speaker or speech label, valence, and arousal. Add a reviewer ID before clicking **Save approve and next**. Unknown labels cannot be approved.
 
-Pause refinement uses Praat intensity-based silent/sounding intervals, with a starting threshold of -25 dB relative to the local maximum, 250 ms minimum silence, 120 ms minimum sounding duration, and 30 ms boundary padding constrained to the original segment. It does not classify sounding audio as speech or distinguish TV from people. All-silent or unsuitable adult segments are retained with a review flag rather than silently discarded. Without ITS, no speaker labels are inferred.
+The three TextGrid tiers are `speaker_speech`, `valence`, and `arousal`. They share the same interval boundaries.
 
-Acoustic outputs include duration, digital RMS level in dBFS, mean and range of voiced F0, and voiced fraction. Pitch uses a starting adult range of 60–600 Hz. These settings require review for each population. dBFS is not calibrated sound pressure. Parselmouth embeds a Praat engine that can differ from the standalone executable. Speech rate and learned arousal/valence predictions are future work.
+| Field | Stored values | Meaning |
+| --- | --- | --- |
+| Speaker or speech | `FAN-CDS`, `FAN-ADS`, `MAN-CDS`, `MAN-ADS` | Adult speaker class and intended listener category |
+| Valence | `+1`, `0`, `-1` | Positive, neutral, or negative |
+| Arousal | `+1`, `-1` | High or low |
+| Unknown | `?`, `FAN-?`, `MAN-?` | Information still requiring review |
 
-## Saved files
+Apply your study's coding protocol when assigning these values. FAN and MAN are adult speech classes imported from LENA metadata, rather than individual speaker identities. CDS means child directed speech; ADS means adult directed speech. CHN refers to the key child's vocalizations in the metadata.
 
-Each run contains `excerpt.wav`, `annotations.TextGrid`, `run.json`, `suggestions.json`, `quality.csv`, `acoustics.csv`, `reviews.json`, and `activity.jsonl`. Draft acoustic/quality files describe the preparation boundaries. The review display refreshes quality flags on reload; exports recompute acoustic and quality measurements.
+Use **Apply boundaries to all tiers** after entering start or end times. Shared neighboring boundaries move together, and the current form labels are saved with the change. **Exclude selected** clears the interval's labels while retaining the audio and a TextGrid backup.
 
-Each export has its own folder with approved clips, the reviewed TextGrid and excerpt, a manifest with original and excerpt-relative timestamps, suggestion and review records, and coverage. The coverage table includes all 16 non-neutral combinations plus eight neutral combinations, including zero counts. Suggested labels and reviewed labels remain distinguishable in the saved files. Original WAV/ITS files are never edited.
+| Control | Action |
+| --- | --- |
+| **F5** | Play the selected interval with one second of context on each side |
+| **Ctrl+S** | Save labels and keep a backup of the previous TextGrid |
+| **Ctrl+Enter** | Save, approve under the entered reviewer ID, and select the next candidate |
+| **Ctrl+Left** or **Ctrl+Right** | Select the previous or next candidate |
+| **F6** | Open the selection in Praat |
+| **Show** | Filter the list by review status or place flagged intervals first |
+| **Play after Next** | Play context when moving to another candidate |
 
-## Set up another PC
+An approval applies to the exact boundaries and labels that were reviewed. Changing them invalidates that approval. External file changes leave unsaved form edits in place; choosing **Reload** discards those edits. Earlier TextGrids are kept in the run's `history` folder.
 
-Install Python 3.12 with Tcl/Tk and the Python launcher, copy the source package, and double-click `setup.cmd`. Obtain Praat from its official Windows download page and select the executable or put it at `tools\Praat.exe`. Then run `start.cmd`. Do not copy another person's `.venv`; setup creates the local environment. The source package excludes recordings, results, dependencies, and Praat binaries.
+## Edit in Praat
 
-## Command line examples
+![Praat TextGrid editor showing synthetic audio and the speaker, valence, and arousal tiers](docs/images/praat.jpg)
+
+Praat opens with the selected interval and the three annotation tiers. The example above uses generated audio.
+
+1. Save your work in any other Praat instance and close that instance before starting a review from ANVUREL.
+2. Select a candidate and click **Open selection in Praat**, or press **F6**.
+3. Correct the boundaries and labels in the editor. ANVUREL pauses its own editing, approval, and export controls while that session is open. Its Previous and Next controls can still navigate the Praat editor.
+4. Return to ANVUREL and click **Finish and save Praat**. This saves the TextGrid, closes the dedicated session, and reloads the annotations.
+
+You may also save and close Praat manually. Save the Praat session before closing ANVUREL. **Auto reload saved TextGrid** detects external saves. If the tier boundaries differ, **Align to speaker tier** rebuilds the valence and arousal intervals from the speaker tier. It retains unambiguous labels, replaces conflicting labels with `?`, and keeps a backup.
+
+In Praat, Shift plus drag moves boundaries that share a time across tiers. The application communicates with Praat through scripts and `--send` commands. This requires a Windows desktop session that permits communication between processes. Automated navigation and saving require a single Praat instance.
+
+## How suggestions are made
+
+The rules use adult segments, child utterance times, conversation boundaries, word counts, and turn codes from the ITS file. Within a conversation, they look for a preceding valid turn that ends no more than five seconds before the current turn. Recognized LENA turn codes take precedence over the timing fallback.
+
+An adult and child pair can support CDS. A pair from different adult classes can support ADS. If the evidence conflicts or is missing, the label stays unknown. Two FAN turns, or two MAN turns, do not establish that different people are speaking. Overlapping adult segments also retain unknown labels and an overlap flag.
+
+The rules adapt the repository's [`classify_interactions.m`](https://github.com/MAHanafy/LENA-Analysis/blob/anvurel/%2Blena/classify_interactions.m). ANVUREL considers all conversation types; the MATLAB extraction workflow uses AICM conversations. For comparisons, the Python function `interaction_suggestions(..., aicm_only=True)` can restrict suggestions to that scope.
+
+These suggestions are rules requiring review, with no calibrated confidence score. The evidence is saved in `suggestions.json`. The application includes no trained model for valence or arousal.
+
+## Segmentation and acoustic measurements
+
+Pause refinement uses Praat's [silent and sounding interval analysis](https://www.fon.hum.uva.nl/praat/manual/Sound__To_TextGrid__silences____.html). It does not determine whether a sound is speech. Silent or unsuitable adult segments are retained with a flag for review.
+
+| Setting | Current value |
+| --- | --- |
+| Silence threshold | 25 dB below the local maximum |
+| Minimum silence | 250 ms |
+| Minimum sounding interval | 120 ms |
+| Boundary padding | 30 ms, constrained to the original segment |
+| Adult pitch search range | 60 to 600 Hz |
+
+Measurements include interval duration, RMS level in dBFS, mean and range of voiced F0, and voiced fraction. Review the analysis settings for your population. dBFS measures digital signal level and is not calibrated sound pressure. Parselmouth's embedded Praat engine may differ from the standalone program.
+
+Speech rate and learned emotion predictions are not included. Time savings and annotation agreement still need to be evaluated against independent human annotations.
+
+## Saved files and exports
+
+By default, runs are saved under `outputs/anvurel/automation_runs` in the repository folder. You can choose another output location in the interface.
+
+| File in each run | Contents |
+| --- | --- |
+| `excerpt.wav` | Audio for the selected excerpt |
+| `annotations.TextGrid` | The three annotation tiers |
+| `run.json` | Source details, excerpt timing, preparation settings, and audio checksum |
+| `suggestions.json` | Initial labels, supporting rules, and overlap flags |
+| `quality.csv` | Preparation flags for quiet audio, possible clipping, short intervals, and uncertain speaker or listener |
+| `acoustics.csv` | Acoustic measurements at the preparation boundaries |
+| `reviews.json` | Explicit approvals and reviewer IDs |
+| `activity.jsonl` | Preparation and review events |
+
+Click **Export approved** after reviewing the intervals you want to use. Each export is written to a new folder. It contains the approved clips, reviewed TextGrid and excerpt, timestamps on the original and excerpt timelines, review and suggestion records, and coverage counts. Acoustic measurements use the approved boundaries. Quality flags are recalculated from the current TextGrid.
+
+Coverage includes 16 combinations of speaker class, speech type, positive or negative valence, and arousal. Eight further combinations use neutral valence. Categories with no approved clips have a count of zero. The source WAV and ITS files are left unchanged.
+
+## Working with a team
+
+Each researcher can install ANVUREL on their own Windows computer, or use an installation on a shared computer. Keep source recordings in an agreed location and use separate run folders for independent raters.
+
+Use one active reviewer per run folder. A queue lock allows one preparation worker per batch, but the application has no shared account system or simultaneous annotation service. Reviewed folders and exports can be shared through your team's approved storage.
+
+## Command line use
+
+Run these commands from the `anvurel` folder. The input and output paths below are examples; replace them with your own.
 
 ```powershell
-.venv\Scripts\python.exe app.py --prepare "C:\data\NH\recording.wav" --its "C:\data\NH\recording.its" --length 300
-.venv\Scripts\python.exe app.py --batch "C:\data\NH" --group Auto --mode first --length 300 --output "C:\data\pilot_outputs"
-.venv\Scripts\python.exe app.py --resume "C:\data\pilot_outputs\batch_ID"
-.venv\Scripts\python.exe app.py --load "C:\data\pilot_outputs\batch_ID\runs\run_ID"
-.venv\Scripts\python.exe app.py --export "C:\data\pilot_outputs\batch_ID\runs\run_ID"
+.venv\Scripts\python.exe app.py --prepare "examples\NH\recording.wav" --its "examples\NH\recording.its" --length 300
+.venv\Scripts\python.exe app.py --batch "examples\NH" --group Auto --mode first --length 300 --output "review_output"
+.venv\Scripts\python.exe app.py --resume "review_output\batch_ID"
+.venv\Scripts\python.exe app.py --load "review_output\batch_ID\runs\run_ID"
+.venv\Scripts\python.exe app.py --export "review_output\batch_ID\runs\run_ID"
+```
+
+Use `--no-refine` to keep the imported boundaries or `--no-suggest` to leave CDS/ADS suggestions disabled.
+
+To run the automated checks:
+
+```powershell
 .venv\Scripts\python.exe -m unittest discover -s . -p "test_*.py" -v
 ```
 
-Use `--no-refine` or `--no-suggest` to disable either draft automation. Validate time savings and annotation agreement against independent human annotations on real NH/HA recordings; no improvement in speed or emotion accuracy has been established yet.
-
-## Technical references
-
-- Praat command-line scripting: https://www.fon.hum.uva.nl/praat/manual/Scripting_6_9__Calling_from_the_command_line.html
-- Praat editor scripting: https://www.fon.hum.uva.nl/praat/manual/Scripting_7_1__Scripting_an_editor_from_a_shell_script.html
-- Praat silent/sounding segmentation: https://www.fon.hum.uva.nl/praat/manual/Sound__To_TextGrid__silences____.html
-- Praat Windows downloads: https://www.fon.hum.uva.nl/praat/download_win.html
+For details of the Praat integration, see the official documentation on [calling Praat from the command line](https://www.fon.hum.uva.nl/praat/manual/Scripting_6_9__Calling_from_the_command_line.html) and [scripting an editor](https://www.fon.hum.uva.nl/praat/manual/Scripting_7_1__Scripting_an_editor_from_a_shell_script.html).

@@ -1,16 +1,19 @@
-# Version 2.0.1
+# Change history
 
-- Adopt ANVUREL as the application name and rename the application folder to `anvurel`.
-- Store application outputs under `outputs/anvurel` and retain existing annotations and pilot results.
-- Publish the application on the `anvurel` branch of LENA-Analysis.
+## Version 2.0.1
 
-# Changes in version 2
+The application is named ANVUREL and lives in the `anvurel` folder. Default outputs are stored under `outputs/anvurel`. Existing annotations and pilot results remain readable.
 
-- Recursive WAV/ITS discovery, automatic NH/HA folder grouping, first/all chunk modes, persistent queue, cancellation between excerpts, and resume without overwriting completed work.
-- Praat pause-based boundary refinement, with retained uncertain regions and overlap flags.
-- Explained draft CDS/ADS rules adapted from the project classifier. All conversation types are considered; conflicts and same-class identity ambiguity remain unknown.
-- Dedicated Praat editor opening, selection, navigation, save/finish, file-change detection, and protection against concurrent app/editor writes.
-- Review filters, waveform context, playback, keyboard shortcuts, shared boundary edits, explicit exclusion, annotation backups, and event logs.
-- Backward-compatible loading of existing runs, portable pilot launcher, and refreshed quality/acoustic export.
+Installation instructions describe setup on any Windows computer. The workflow screenshots use generated audio and artificial ITS metadata.
 
-Valence and arousal remain human labels. No trained emotion classifier or hosted AI service has been added.
+## Version 2.0
+
+Batch preparation scans folders for WAV and ITS pairs, infers NH or HA groups from folder names, and supports the first excerpt or all consecutive excerpts. Progress is saved after each job. A batch can stop after the current excerpt and resume without replacing completed runs.
+
+Praat pause analysis can refine imported boundaries. CDS and ADS suggestions use conversation rules adapted from the MATLAB classifier, with the evidence retained for review. Conflicting evidence and uncertain speaker identity remain unknown.
+
+The Praat connection opens a selected interval in a dedicated editor and supports navigation, saving, and reloading. The application prevents its own annotation changes while that editor is active.
+
+Review controls include waveform context, playback, filters, keyboard shortcuts, shared boundary edits, exclusion, and explicit approval. TextGrid backups and activity logs preserve earlier work. Exports recalculate acoustic measurements for the reviewed boundaries.
+
+Valence and arousal are assigned by a reviewer. This version includes no trained emotion classifier or hosted AI service.
