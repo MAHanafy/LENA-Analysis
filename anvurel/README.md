@@ -2,7 +2,7 @@
 
 Assisted Naturalistic Vocal Utterance Review and Emotion Labeling
 
-Version 2.1.0
+Version 2.2.0
 
 ANVUREL is a Windows desktop application for annotating adult speech in LENA recordings. It prepares audio excerpts, imports adult segments from ITS metadata, and creates a Praat TextGrid. A researcher checks the boundaries and labels before exporting clips.
 
@@ -114,6 +114,18 @@ Praat opens with the selected interval and the three annotation tiers. The examp
 You may also save and close Praat manually. Save the Praat session before closing ANVUREL. **Auto reload saved TextGrid** detects external saves. If the tier boundaries differ, **Align to speaker tier** rebuilds the valence and arousal intervals from the speaker tier. It retains unambiguous labels, replaces conflicting labels with `?`, and keeps a backup.
 
 In Praat, Shift plus drag moves boundaries that share a time across tiers. The application communicates with Praat through scripts and `--send` commands. This requires a Windows desktop session that permits communication between processes. Automated navigation and saving require a single Praat instance.
+
+## Timed transcripts
+
+The **Transcript** tab imports JSON from Whisper, SRT, or VTT. Choose whether the times refer to the excerpt or the original recording before importing. Original times are converted using the excerpt's source offset. Cues crossing an excerpt boundary are clipped and flagged for checking.
+
+Select a text segment and click **Play text segment** to hear that exact span. **Show matching annotation** selects the candidate with the greatest overlap. Text overlapping the current candidate also appears in Guided review. A cue that covers several intervals can appear for each of them; it does not establish a word boundary.
+
+For local speech recognition, run `setup_transcription.cmd` once to install the optional speech component. Choose `tiny`, `base`, or `small`, then click **Generate transcript**. The first use needs **Allow model download** selected to obtain the model. Leave it cleared to use only models already cached on the computer. Audio processing runs locally. The language field accepts `auto` or a language code such as `en`.
+
+Generation runs in the background and can be stopped after the current model or decoding step. An incomplete or failed operation retains the previous transcript. Saved text is tied to the excerpt checksum and source offset. Changed audio or invalid times require a new transcript.
+
+Transcript text remains a draft. Listen to confirm its words and timing. Import and generation leave the speaker, emotion, and approval labels unchanged.
 
 ## How suggestions are made
 

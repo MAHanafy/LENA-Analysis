@@ -36,6 +36,7 @@ class GuidedReviewMixin:
         self.canvas.bind('<Configure>', self.redraw_selection)
         ttk.Label(page, textvariable=self.detail).pack(anchor='w')
         ttk.Label(page, textvariable=self.evidence, wraplength=1120).pack(anchor='w', pady=5)
+        ttk.Label(page, textvariable=self.transcript_preview, wraplength=1120).pack(anchor='w', pady=(0,4))
         choices = [('Speaker and listener', 'speaker', [('FAN to child','FAN-CDS'),('FAN to adult','FAN-ADS'),
             ('MAN to child','MAN-CDS'),('MAN to adult','MAN-ADS'),('FAN ?','FAN-?'),('MAN ?','MAN-?'),('Unknown','?')]),
             ('Valence', 'valence', [('Positive','+1'),('Neutral','0'),('Negative','-1'),('Unknown','?')]),

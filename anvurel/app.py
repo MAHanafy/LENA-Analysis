@@ -15,10 +15,11 @@ import batch
 import core
 import review_tools
 from guided_ui import GuidedReviewMixin
+from transcript_ui import TranscriptUIMixin
 
 BASE=Path(__file__).resolve().parent
 
-class Application(GuidedReviewMixin):
+class Application(GuidedReviewMixin,TranscriptUIMixin):
     def __init__(self,root):
         self.root,self.run,self.rows=root,None,[]
         self.meta,self.reviews={},{}
@@ -35,6 +36,7 @@ class Application(GuidedReviewMixin):
             'folder':'','batch_group':'Auto','batch_mode':'first','filter':'Needs review'}
         self.vars={k:tk.StringVar(value=v) for k,v in defaults.items()}
         self.init_guided()
+        self.init_transcripts(BASE.parent/'outputs'/'anvurel'/'models')
         self.refine=tk.BooleanVar(value=True);self.suggest=tk.BooleanVar(value=True)
         self.autoplay=tk.BooleanVar(value=False);self.autoreload=tk.BooleanVar(value=True)
         self.status=tk.StringVar(value='Select a recording or scan a folder. Processing stays local.')
@@ -47,9 +49,9 @@ class Application(GuidedReviewMixin):
         ttk.Label(box,text='ANVUREL Annotation Assistant',font=('Segoe UI',18,'bold')).pack(anchor='w')
         ttk.Label(box,text='Prepare folders • inspect suggestions • review in Praat • export approved samples').pack(anchor='w',pady=(0,7))
         self.tabs=ttk.Notebook(box);self.tabs.pack(fill='both',expand=True)
-        self.prepare_tab,self.batch_tab,self.guided_tab,self.review_tab=[ttk.Frame(self.tabs,padding=10) for _ in range(4)]
-        for page,name in [(self.prepare_tab,'Prepare recording'),(self.batch_tab,'Batch preparation'),(self.guided_tab,'Guided review'),(self.review_tab,'Review samples')]:self.tabs.add(page,text=name)
-        self.make_prepare();self.make_batch();self.make_review();self.make_guided()
+        self.prepare_tab,self.batch_tab,self.guided_tab,self.review_tab,self.transcript_tab=[ttk.Frame(self.tabs,padding=10) for _ in range(5)]
+        for page,name in [(self.prepare_tab,'Prepare recording'),(self.batch_tab,'Batch preparation'),(self.guided_tab,'Guided review'),(self.review_tab,'Review samples'),(self.transcript_tab,'Transcript')]:self.tabs.add(page,text=name)
+        self.make_prepare();self.make_batch();self.make_review();self.make_guided();self.make_transcripts()
         ttk.Label(box,textvariable=self.status,wraplength=1180).pack(fill='x',pady=(7,0))
         for key in ('speaker','valence','arousal','start','end'):self.vars[key].trace_add('write',self.mark_dirty)
         root.bind('<Escape>',lambda e:self.stop_audio())
@@ -222,6 +224,7 @@ class Application(GuidedReviewMixin):
         try:
             while True:
                 ev=self.events.get_nowait()
+                if self.handle_transcript_event(ev):continue
                 if ev[0]=='idle':
                     self.busy=False;self.prepare_button.state(['!disabled'])
                     if self.closing:self.close();return
@@ -254,6 +257,7 @@ class Application(GuidedReviewMixin):
         if path:self.guard(lambda:self.load_run(path))
 
     def load_run(self,path):
+        if self._transcript_operation is not None and self.busy:raise ValueError('Stop transcription and wait for it to finish before switching runs.')
         if self.praat_active() and self.run!=Path(path).resolve():raise ValueError('Finish Praat before switching runs.')
         self.cancel_autosave();self.autosave_form();self.stop_audio();self.undo_tokens=[]
         self.run=Path(path).resolve();self.dirty=False;self.focused_index=None;self.reload_impl();self.tabs.select(self.guided_tab);self.draft_notice()
@@ -273,6 +277,7 @@ class Application(GuidedReviewMixin):
         self.filling=True
         for key,value in [('source',self.meta['source']),('its',self.meta.get('its_source') or ''),('group',self.meta['group']),('offset',str(self.meta['source_offset']))]:self.vars[key].set(value)
         self.filling=False;self.dirty=False;self.render()
+        self.load_transcript_for_run()
         approved=sum(core.valid(r) and core.signature(r) in self.reviews for r in self.rows)
         count=sum(any(r[t] for t in core.TIERS) for r in self.rows)
         self.review_progress.set(f'{approved} of {count} candidates approved. Unknown labels remain for review.')
@@ -323,6 +328,7 @@ class Application(GuidedReviewMixin):
         descriptions=[f'{e["pair"]} ({e["source"]}, gap {e["gap_seconds"]:.2f}s)' for e in ev.get('evidence',[])[:3]]
         self.evidence.set('Initial suggestion: '+ev['reason']+(' | '+'; '.join(descriptions) if descriptions else '')+'. Human review required.')
         self.draw(row)
+        self.update_transcript_selection(row)
 
     def draw(self,row):
         a=max(0,row['start']-1);b=min(self.meta['duration'],row['end']+1)
