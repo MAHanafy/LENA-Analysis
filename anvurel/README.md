@@ -14,7 +14,7 @@ The screenshots below show generated tones and artificial ITS metadata. Their la
 
 For team use, get `ANVUREL-Setup-2.4.1.exe` from the project maintainer through the storage location approved by your institution. GitHub Actions artifacts are temporary build files and require GitHub access, so they are for maintainers rather than the medical team. Extract the installer ZIP and run the EXE. The package includes a `.sha256` checksum file; maintainers can compare it with PowerShell's `Get-FileHash -Algorithm SHA256` result before sharing. ANVUREL creates a Start menu shortcut and offers an optional desktop shortcut. Python does not need to be installed separately.
 
-The installer stores work locally under `%LOCALAPPDATA%\ANVUREL`. It does not include recordings, transcripts, or annotation results. It includes the local speech component. The selected speech model is downloaded only after a reviewer opts in. Praat is optional and must be installed separately for editor review. The installer is unsigned, so an institution may require IT approval before installation. ANVUREL saves the selected output folder and Praat path in its per-user settings file. It does not save the reviewer ID there.
+The installer stores work locally under `%LOCALAPPDATA%\ANVUREL`. It does not include recordings, transcripts, or annotation results. It includes the local speech component. The selected speech model is downloaded only after a reviewer opts in. Praat is optional and must be installed separately for editor review. The installer is unsigned. Windows may show a "Windows protected your PC" message; if your institution allows it, choose **More info** and then **Run anyway**. Otherwise, ask IT to approve the installer first. ANVUREL saves the selected output folder and Praat path in its per-user settings file. It does not save the reviewer ID there.
 
 To run from source instead, download the [ANVUREL branch](https://github.com/MAHanafy/LENA-Analysis/archive/refs/heads/anvurel.zip), install Python 3.12 with Tcl/Tk, pip, and the Python launcher, then run `setup.cmd` followed by `start.cmd` from the `anvurel` folder. Setup needs internet access. Install [Praat for Windows](https://www.fon.hum.uva.nl/praat/download_win.html) separately if you need its editor.
 
@@ -113,7 +113,11 @@ Praat opens with the selected interval and the three annotation tiers. The examp
 3. Correct the boundaries and labels in the editor. ANVUREL pauses its own editing, approval, and export controls while that session is open. Its Previous and Next controls can still navigate the Praat editor.
 4. Return to ANVUREL and click **Finish and save Praat**. This saves the TextGrid, confirms the save, closes the dedicated session, and reloads the annotations.
 
-Use **Finish and save Praat** to end an ANVUREL session. ANVUREL keeps a TextGrid recovery copy in the run's `history` folder before opening Praat. If Praat closes by its own window controls, ANVUREL warns that edits may not have been saved and shows the Praat script and recovery file names. When the TextGrid changed, it reloads the file and asks you to check it. **Auto reload saved TextGrid** detects other external saves. If the tier boundaries differ, **Align to speaker tier** rebuilds the valence and arousal intervals from the speaker tier. It retains unambiguous labels, replaces conflicting labels with `?`, and keeps a backup.
+Recent Praat versions show a **Praat Trust window** when ANVUREL finishes the session, because the finish script writes a small confirmation file. Choose **Yes, I allow this script to perform the action that it requests**. Do not choose **Cancel**: Praat then stops the script partway, and the session can only be ended by closing Praat yourself. Do not choose the option that lets scripts control your computer; ANVUREL does not need it.
+
+Praat may also report that the phonetic font is not available when the editor opens. This does not affect the annotations. Click **OK** to continue.
+
+Use **Finish and save Praat** to end an ANVUREL session. ANVUREL keeps a TextGrid recovery copy in the run's `history` folder before opening Praat. That copy is the TextGrid as it was before Praat opened, so it cannot restore edits that Praat never saved. If Praat closes by its own window controls, ANVUREL warns that edits may not have been saved and shows the Praat script and recovery file names. When the TextGrid changed, it reloads the file and asks you to check it. **Auto reload saved TextGrid** detects other external saves. If the tier boundaries differ, **Align to speaker tier** rebuilds the valence and arousal intervals from the speaker tier. It retains unambiguous labels, replaces conflicting labels with `?`, and keeps a backup.
 
 In Praat, Shift plus drag moves boundaries that share a time across tiers. The application communicates with Praat through scripts and `--send` commands. This requires a Windows desktop session that permits communication between processes. Automated navigation and saving require a single Praat instance.
 
@@ -195,6 +199,8 @@ Exports are prepared in a temporary folder. The final export appears after all f
 ## Pilot checks
 
 The automated checks cover draft recovery, approval undo, playback speed and pitch, transcript offsets, comparison with deliberate disagreements, and the complete preparation to export workflow. They also check a 1000 by 700 window and reject stale audio or annotations. Local speech recognition has been exercised on a five minute recording. These checks establish software behavior; transcript accuracy, annotation agreement, and time savings still require assessment by researchers.
+
+In version 2.4.1, running the automated checks on a computer where ANVUREL is used replaces the saved output folder and Praat path with temporary test folders. After running them, open ANVUREL and confirm both settings before preparing a run.
 
 ## Working with a team
 
