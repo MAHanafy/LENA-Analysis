@@ -5,6 +5,7 @@ import math
 import os
 import queue
 import subprocess
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -20,6 +21,16 @@ from comparison_ui import ComparisonUIMixin
 
 BASE=Path(__file__).resolve().parent
 
+def data_dir():
+    """Use writable per-user storage when running from the installer."""
+    if getattr(sys,'frozen',False):
+        root=Path(os.environ.get('LOCALAPPDATA',Path.home()/'AppData'/'Local'))/'ANVUREL'
+        root.mkdir(parents=True,exist_ok=True)
+        return root
+    return BASE.parent/'outputs'/'anvurel'
+
+DATA_DIR=data_dir()
+
 class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
     def __init__(self,root):
         self.root,self.run,self.rows=root,None,[]
@@ -31,13 +42,13 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
         self.grid_hash,self.file_stamp=None,None
         self.focused_index=None
         self.praat_process,self.batch_path=None,None
-        defaults={'source':'','its':'','output':str(BASE.parent/'outputs'/'anvurel'/'automation_runs'),
+        defaults={'source':'','its':'','output':str(DATA_DIR/'automation_runs'),
             'praat':str(BASE/'tools'/'Praat.exe'),'group':'Auto','offset':'0','length':'300',
             'reviewer':'','speaker':'?','valence':'?','arousal':'?','start':'','end':'',
             'folder':'','batch_group':'Auto','batch_mode':'first','filter':'Needs review'}
         self.vars={k:tk.StringVar(value=v) for k,v in defaults.items()}
         self.init_guided()
-        self.init_transcripts(BASE.parent/'outputs'/'anvurel'/'models')
+        self.init_transcripts(DATA_DIR/'models')
         self.init_comparison()
         self.refine=tk.BooleanVar(value=True);self.suggest=tk.BooleanVar(value=True)
         self.autoplay=tk.BooleanVar(value=False);self.autoreload=tk.BooleanVar(value=True)
@@ -462,7 +473,7 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--prepare',metavar='WAV');parser.add_argument('--its')
-    parser.add_argument('--output',default=str(BASE.parent/'outputs'/'anvurel'/'automation_runs'))
+    parser.add_argument('--output',default=str(DATA_DIR/'automation_runs'))
     parser.add_argument('--group',choices=['Auto','NH','HA','Reference'],default='Auto')
     parser.add_argument('--offset',type=float,default=0);parser.add_argument('--length',type=float,default=300)
     parser.add_argument('--no-refine',action='store_true');parser.add_argument('--no-suggest',action='store_true')
@@ -481,7 +492,7 @@ def main():
         root=tk.Tk();app=Application(root)
         if args.load:app.guard(lambda:app.load_run(args.load))
         elif args.pilot:
-            pointer=BASE.parent/'outputs'/'anvurel'/'latest_pilot.json'
+            pointer=DATA_DIR/'latest_pilot.json'
             if pointer.exists():
                 data=json.loads(pointer.read_text(encoding='utf-8'))
                 app.guard(lambda:app.load_run(pointer.parent/data['run']))

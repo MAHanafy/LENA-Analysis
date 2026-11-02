@@ -1,0 +1,42 @@
+name: Build ANVUREL installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "anvurel-v*"
+    paths:
+      - "anvurel/**"
+      - ".github/workflows/anvurel-installer.yml"
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install application and packaging dependencies
+        working-directory: anvurel
+        run: python -m pip install -r requirements.txt -r requirements-transcription.txt pyinstaller
+      - name: Run application checks
+        working-directory: anvurel
+        run: python -m unittest discover -s . -p "test_*.py" -v
+      - name: Build standalone application
+        working-directory: anvurel
+        run: python -m PyInstaller --clean --noconfirm anvurel.spec
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Compile installer
+        working-directory: anvurel
+        run: |
+          New-Item -ItemType Directory -Force installer/output | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/ANVUREL.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ANVUREL-Windows-Installer
+          path: anvurel/installer/output/ANVUREL-Setup-2.4.0.exe
+          if-no-files-found: error

@@ -46,7 +46,7 @@ class TranscriptUIMixin:
         ttk.Checkbutton(settings, text='Allow model download', variable=self.transcript_download).pack(side='left', padx=(0, 12))
         ttk.Button(settings, text='Generate transcript', command=self.generate_transcript).pack(side='left')
         ttk.Button(settings, text='Stop transcription', command=self.stop_transcription).pack(side='left', padx=6)
-        ttk.Label(generation, text='Use auto to detect the language, or enter a language code such as en. Model downloads are off by default.\nGeneration requires the optional speech component installed with setup_transcription.cmd.',
+        ttk.Label(generation, text='Use auto to detect the language, or enter a language code such as en. Model downloads are off by default.\nThe installer includes the speech component. The source version needs setup_transcription.cmd.',
                   wraplength=1100).pack(anchor='w', pady=(6, 0))
         self.transcript_tree = self.table(page, ('start', 'end', 'text'), ('Start s', 'End s', 'Draft text'), (90, 90, 900))
         self.transcript_tree.bind('<<TreeviewSelect>>', self.select_transcript_segment)

@@ -12,11 +12,11 @@ The screenshots below show generated tones and artificial ITS metadata. Their la
 
 ## Installation
 
-1. Download the [ANVUREL branch](https://github.com/MAHanafy/LENA-Analysis/archive/refs/heads/anvurel.zip) or clone the repository and select the `anvurel` branch. Extract the archive before running the application.
-2. Install Python 3.12 with Tcl/Tk, pip, and the Python launcher. The [Python installation guide for Windows](https://docs.python.org/3.12/using/windows.html) describes these components.
-3. Open the `anvurel` folder and run `setup.cmd`. It creates a local `.venv` folder and installs the packages listed in `requirements.txt`. This step needs internet access.
-4. Download [Praat for Windows](https://www.fon.hum.uva.nl/praat/download_win.html). Extract `Praat.exe` and either place it in `anvurel/tools` or select its location in the application.
-5. Run `start.cmd` from the `anvurel` folder.
+For the team installer, open the repository's **Actions** page, choose **Build ANVUREL installer**, and download the `ANVUREL-Windows-Installer` artifact from a successful run. Extract the artifact and run `ANVUREL-Setup-2.4.0.exe`. It creates a Start menu shortcut and offers an optional desktop shortcut. Python does not need to be installed separately.
+
+The installer stores work locally under `%LOCALAPPDATA%\ANVUREL`. It does not include recordings, transcripts, or annotation results. It includes the local speech component. The selected speech model is downloaded only after a reviewer opts in. Praat is optional and must be installed separately for editor review. The installer is unsigned, so an institution may require IT approval before installation.
+
+To run from source instead, download the [ANVUREL branch](https://github.com/MAHanafy/LENA-Analysis/archive/refs/heads/anvurel.zip), install Python 3.12 with Tcl/Tk, pip, and the Python launcher, then run `setup.cmd` followed by `start.cmd` from the `anvurel` folder. Setup needs internet access. Install [Praat for Windows](https://www.fon.hum.uva.nl/praat/download_win.html) separately if you need its editor.
 
 The standalone Praat program is used for manual editing. Preparation and acoustic analysis use the Praat engine supplied by Parselmouth. Each computer needs its own Python environment; run `setup.cmd` on that computer rather than copying an existing `.venv` folder.
 
