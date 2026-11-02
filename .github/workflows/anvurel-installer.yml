@@ -3,8 +3,8 @@ name: Build ANVUREL installer
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "anvurel-v*"
+    branches:
+      - "anvurel"
     paths:
       - "anvurel/**"
       - ".github/workflows/anvurel-installer.yml"
