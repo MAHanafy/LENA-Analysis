@@ -58,10 +58,9 @@ class TranscriptExportTests(Fixture):
         self.assertEqual(record['source_end'], row['end'] + 20.)
         self.assertEqual(record['clip_start'], 0.)
         self.assertAlmostEqual(record['clip_end'], row['end'] - row['start'])
-        self.assertEqual(record['text'], 'Full cue text')
         self.assertTrue(record['partial_cue'])
         self.assertTrue(record['draft'])
-        self.assertEqual(bundle['document']['segments'][0]['start'], cue_start)
+        self.assertEqual(record['text'], '')
 
     def test_complete_cue_inside_clip_has_offset_and_no_partial_flag(self):
         _, row = self.selected[0]
@@ -79,6 +78,7 @@ class TranscriptExportTests(Fixture):
         self.assertEqual({row['segment'] for row in records}, {1})
         self.assertEqual(len({row['sample_id'] for row in records}), len(self.selected))
         self.assertTrue(all(row['partial_cue'] for row in records))
+        self.assertTrue(all(row['text'] == '' for row in records))
 
     def test_touching_cues_do_not_overlap_a_clip(self):
         _, row = self.selected[0]
@@ -97,8 +97,8 @@ class TranscriptExportTests(Fixture):
         self.set_offset(20.)
         self.import_segments([{'start': 19., 'end': 27., 'text': 'Cue clipped to excerpt'}], timeline='original')
         bundle = transcript_export.prepare_export(self.run, self.selected)
-        self.assertTrue(bundle['document']['segments'][0]['clipped'])
         self.assertTrue(all(row['partial_cue'] for row in bundle['rows']))
+        self.assertTrue(all(row['text'] == '' for row in bundle['rows']))
 
     def test_no_transcript_produces_no_files_or_directory(self):
         bundle = transcript_export.prepare_export(self.run, self.selected)
@@ -132,28 +132,30 @@ class TranscriptExportTests(Fixture):
         with self.assertRaisesRegex(ValueError, 'changed or is no longer approved'):
             transcript_export.prepare_export(self.run, self.selected)
 
-    def test_json_and_csv_are_detached_clean_snapshots_and_run_stays_unchanged(self):
+    def test_export_csv_omits_partial_text_and_run_stays_unchanged(self):
         _, row = self.selected[0]
-        document = self.import_segments([{'start': row['start'], 'end': row['end'],
+        cue_start, cue_end = row['start'] + .1, row['end'] - .1
+        document = self.import_segments([{'start': cue_start, 'end': cue_end,
             'text': 'Text with commas, quotes "and" Unicode café',
-            'words': [{'start': row['start'], 'end': row['end'], 'word': 'café', 'probability': .9}]}])
+            'words': [{'start': cue_start, 'end': cue_end, 'word': 'café', 'probability': .9}]},
+            {'start': row['start']-.1, 'end': row['end']+.1, 'text': 'Unapproved boundary words'}])
         before = {path.name: path.read_bytes() for path in self.run.iterdir() if path.is_file()}
         bundle = transcript_export.prepare_export(self.run, self.selected[:1])
         document['segments'][0]['text'] = 'Changed in a caller object'
         destination = self.destination()
         transcript_export.write_export(bundle, destination)
-        snapshot = json.loads((destination / 'transcript.json').read_text(encoding='utf-8'))
-        self.assertTrue(snapshot['draft'])
-        self.assertEqual(snapshot['audio_sha256'], core.digest(self.run / 'excerpt.wav'))
-        self.assertNotIn('Changed in a caller object', snapshot['segments'][0]['text'])
-        self.assertEqual(snapshot, bundle['document'])
+        self.assertFalse((destination / 'transcript.json').exists())
         with (destination / 'transcript_segments.csv').open(encoding='utf-8-sig', newline='') as stream:
             reader = csv.DictReader(stream)
             self.assertEqual(tuple(reader.fieldnames), transcript_export.FIELDS)
             records = list(reader)
-        self.assertEqual(records[0]['text'], snapshot['segments'][0]['text'])
-        self.assertEqual(records[0]['draft'], 'True')
-        self.assertEqual(records[0]['partial_cue'], 'False')
+        self.assertEqual(len(records),2)
+        self.assertEqual(records[0]['text'], '')
+        self.assertEqual(records[0]['partial_cue'], 'True')
+        self.assertEqual(records[1]['text'], 'Text with commas, quotes "and" Unicode café')
+        self.assertEqual(records[1]['draft'], 'True')
+        self.assertEqual(records[1]['partial_cue'], 'False')
+        self.assertNotIn('Unapproved boundary words', (destination / 'transcript_segments.csv').read_text(encoding='utf-8-sig'))
         self.assertEqual(before, {path.name: path.read_bytes() for path in self.run.iterdir() if path.is_file()})
         with self.assertRaises(FileExistsError):
             transcript_export.write_export(bundle, destination)

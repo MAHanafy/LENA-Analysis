@@ -35,8 +35,16 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/ANVUREL.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         shell: pwsh
+      - name: Create SHA-256 checksum
+        shell: pwsh
+        run: |
+          $installer = 'anvurel/installer/output/ANVUREL-Setup-2.4.1.exe'
+          $checksum = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$checksum  ANVUREL-Setup-2.4.1.exe" | Set-Content -LiteralPath "$installer.sha256" -Encoding ascii
       - uses: actions/upload-artifact@v4
         with:
           name: ANVUREL-Windows-Installer
-          path: anvurel/installer/output/ANVUREL-Setup-2.4.0.exe
+          path: |
+            anvurel/installer/output/ANVUREL-Setup-2.4.1.exe
+            anvurel/installer/output/ANVUREL-Setup-2.4.1.exe.sha256
           if-no-files-found: error

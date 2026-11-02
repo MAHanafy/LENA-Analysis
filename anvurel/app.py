@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
+import uuid
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -30,6 +31,17 @@ def data_dir():
     return BASE.parent/'outputs'/'anvurel'
 
 DATA_DIR=data_dir()
+SETTINGS_PATH=Path(os.environ.get('LOCALAPPDATA',Path.home()/'AppData'/'Local'))/'ANVUREL'/'settings.json'
+
+def load_settings():
+    """Load workstation preferences without retaining reviewer identities."""
+    try:
+        value=json.loads(SETTINGS_PATH.read_text(encoding='utf-8'))
+        if not isinstance(value,dict):return {}
+        return {key:value[key] for key in ('output','praat')
+                if isinstance(value.get(key),str) and value[key].strip()}
+    except (OSError,ValueError,TypeError):
+        return {}
 
 class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
     def __init__(self,root):
@@ -42,8 +54,10 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
         self.grid_hash,self.file_stamp=None,None
         self.focused_index=None
         self.praat_process,self.batch_path=None,None
-        defaults={'source':'','its':'','output':str(DATA_DIR/'automation_runs'),
-            'praat':str(BASE/'tools'/'Praat.exe'),'group':'Auto','offset':'0','length':'300',
+        self.praat_baseline=None;self.praat_completion=None;self.praat_script_name='';self.praat_backup=None
+        saved=load_settings()
+        defaults={'source':'','its':'','output':saved.get('output',str(DATA_DIR/'automation_runs')),
+            'praat':saved.get('praat',str(BASE/'tools'/'Praat.exe')),'group':'Auto','offset':'0','length':'300',
             'reviewer':'','speaker':'?','valence':'?','arousal':'?','start':'','end':'',
             'folder':'','batch_group':'Auto','batch_mode':'first','filter':'Needs review'}
         self.vars={k:tk.StringVar(value=v) for k,v in defaults.items()}
@@ -74,17 +88,45 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
 
     def close(self):
         if self.praat_active():
-            messagebox.showinfo('Praat review','Finish and save the Praat session before closing ANVUREL.');return
+            self.show_info('Praat review','Finish and save the Praat session before closing ANVUREL.');return
         self.cancel.set()
         if self.busy:
             self.closing=True;self.status.set('Finishing the current excerpt before closing. Batch progress will be saved.');return
         self.cancel_autosave()
         if not self.autosave_form():
-            messagebox.showinfo('Unsaved form','Correct the boundary times or reset the form before closing.');return
+            self.show_info('Unsaved form','Correct the boundary times or reset the form before closing.');return
         self.stop_audio()
+        self.save_settings()
         for pending in self.root.tk.call('after','info'):
             self.root.after_cancel(pending)
         self.root.destroy()
+
+    def save_settings(self):
+        try:
+            SETTINGS_PATH.parent.mkdir(parents=True,exist_ok=True)
+            core.save_json(SETTINGS_PATH,{
+                'output':self.vars['output'].get().strip(),
+                'praat':self.vars['praat'].get().strip()})
+        except (OSError,ValueError) as error:
+            self.status.set('Preferences could not be saved: '+str(error))
+
+    def show_dialog(self,dialog,title,message):
+        try:
+            self.root.deiconify();self.root.lift();self.root.attributes('-topmost',True)
+            self.root.focus_force();self.root.update_idletasks()
+        except tk.TclError:
+            pass
+        try:
+            return dialog(title,message,parent=self.root)
+        finally:
+            try:
+                self.root.attributes('-topmost',False);self.root.lift()
+            except tk.TclError:
+                pass
+
+    def show_error(self,title,message):self.show_dialog(messagebox.showerror,title,message)
+    def show_warning(self,title,message):self.show_dialog(messagebox.showwarning,title,message)
+    def show_info(self,title,message):self.show_dialog(messagebox.showinfo,title,message)
 
     def entry(self,parent,row,key,label,kind='file'):
         ttk.Label(parent,text=label).grid(row=row,column=0,sticky='w',padx=(0,8),pady=5)
@@ -168,7 +210,7 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
 
     def guard(self,action):
         try:return action()
-        except Exception as e:messagebox.showerror('ANVUREL',str(e));return None
+        except Exception as e:self.show_error('ANVUREL',str(e));return None
 
     def work(self,task):
         if self.busy:raise ValueError('Wait for the current job or stop the batch after its current excerpt.')
@@ -185,10 +227,13 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
             self.vars[key].set(path)
             if key=='source':
                 sibling=Path(path).with_suffix('.its');self.vars['its'].set(str(sibling) if sibling.exists() else '')
+            elif key in ('output','praat'):
+                self.save_settings()
 
     def prepare(self):
         def action():
             args={k:v.get() for k,v in self.vars.items()};refine,suggest=self.refine.get(),self.suggest.get()
+            self.save_settings()
             self.status.set('Preparing excerpt, suggestions, quality flags and Praat measurements...')
             def task():
                 group=batch.infer_group(args['source']) if args['group']=='Auto' else args['group']
@@ -200,6 +245,7 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
     def scan_folder(self):
         def action():
             folder,output=self.vars['folder'].get(),self.vars['output'].get()
+            self.save_settings()
             self.work(lambda:self.events.put(('scan',batch.scan(folder,output))))
             self.status.set('Scanning headers and WAV/ITS pairs...')
         self.guard(action)
@@ -244,7 +290,7 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
                 if ev[0]=='idle':
                     self.busy=False;self.prepare_button.state(['!disabled'])
                     if self.closing:self.close();return
-                elif ev[0]=='error':self.status.set(ev[1]);messagebox.showerror('ANVUREL',ev[1])
+                elif ev[0]=='error':self.status.set(ev[1]);self.show_error('ANVUREL',ev[1])
                 elif ev[0]=='ready':self.guard(lambda:self.load_run(ev[1]))
                 elif ev[0]=='scan':
                     self.batch_path=None;self.fill_batch(ev[1]);count=sum(bool(r['its']) for r in ev[1])
@@ -268,7 +314,7 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
         if self.praat_active():raise ValueError('Finish and save Praat before editing or approving in the app.')
 
     def choose_run(self):
-        if self.praat_active():messagebox.showinfo('Praat review','Finish and save Praat before switching runs.');return
+        if self.praat_active():self.show_info('Praat review','Finish and save Praat before switching runs.');return
         path=filedialog.askdirectory(title='Choose a run folder containing run.json')
         if path:self.guard(lambda:self.load_run(path))
 
@@ -280,7 +326,12 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
         self.cancel_autosave()
         if not self.autosave_form():raise ValueError('Save or reset the current form before switching runs.')
         self.stop_audio()
-        if self.run!=candidate:self.undo_tokens=[]
+        changed_run=self.run!=candidate
+        if changed_run:
+            self.undo_tokens=[]
+            self.vars['reviewer'].set('')
+            self.vars['filter'].set('All')
+            self.tree.selection_remove(*self.tree.selection())
         self.run=candidate;self.dirty=False;self.focused_index=None;self.reload_impl();self.tabs.select(self.guided_tab);self.draft_notice()
 
     def reload(self):
@@ -433,27 +484,89 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
             self.stop_audio();self.cancel_autosave()
             row=self.rows[self.selected_index()]
             if self.praat_active():core.navigate_praat(self.vars['praat'].get(),self.run,row['start'],row['end'])
-            else:self.praat_process=core.open_praat(self.vars['praat'].get(),self.run,row['start'],row['end'])
+            else:
+                if not Path(self.vars['praat'].get()).is_file():
+                    raise ValueError('Select your installed Praat executable before opening the editor.')
+                if core.running_praat_pids():
+                    raise ValueError('Close any existing Praat window before starting the ANVUREL review session.')
+                self.praat_backup=core.backup_annotations(self.run)
+                process=core.open_praat(self.vars['praat'].get(),self.run,row['start'],row['end'])
+                self.praat_process=process;self.praat_baseline=core.digest(self.run/'annotations.TextGrid')
+                self.praat_completion=None;self.praat_script_name='open_review.praat'
             self.status.set('Praat review active. Finish and save Praat before editing or approving in this app.')
         self.guard(action)
 
     def finish_praat(self):
         def action():
             self.require_run()
-            if not self.praat_active():self.praat_process=None;self.reload_impl();return
+            if not self.praat_active():
+                if self.praat_process is not None:self.handle_praat_exit()
+                else:raise ValueError('No app controlled Praat session is open.')
+                return
             core.require_single_praat()
-            script=core.review_script(self.run,close=True)
+            token=uuid.uuid4().hex
+            marker=self.run/('.anvurel-finish-'+token+'.done')
+            script=core.review_script(self.run,close=True,completion_path=marker,completion_token=token)
             subprocess.Popen([str(Path(self.vars['praat'].get()).resolve()),'--send',str(script)])
+            self.praat_completion=(marker,token);self.praat_script_name=script.name
             self.status.set('Saving the dedicated Praat session. The app reloads when it closes.')
         self.guard(action)
 
+    def handle_praat_exit(self):
+        if self.praat_process is None or self.praat_process.poll() is None:return
+        self.praat_process=None
+        marker,token=self.praat_completion or (None,None)
+        confirmed=False
+        if marker is not None:
+            try:confirmed=marker.read_text(encoding='utf-8').strip()==token
+            except OSError:pass
+            try:
+                if marker.resolve().parent==self.run.resolve() and marker.name.startswith('.anvurel-finish-'):
+                    marker.unlink(missing_ok=True)
+            except OSError:pass
+        self.praat_completion=None
+        script=self.praat_script_name or 'open_review.praat'
+        backup=(f'\n\nRecovery backup: {self.praat_backup}' if self.praat_backup else '')
+        baseline=self.praat_baseline
+        self.praat_baseline=None
+        changed=False
+        try:changed=baseline is not None and core.digest(self.run/'annotations.TextGrid')!=baseline
+        except OSError:pass
+        if self.dirty:
+            self.status.set('Praat closed while the form has unsaved edits. Review them before reloading.')
+            self.show_warning('Praat session ended',
+                f'Praat session script: {script}\n\nThe form has unsaved edits. ANVUREL kept them in place. Check the saved TextGrid before continuing.{backup}')
+            return
+        if confirmed:
+            try:
+                self.reload_impl()
+                self.status.set('Praat edits were saved and reloaded.')
+            except Exception as error:
+                self.status.set('Praat save was reported, but the TextGrid could not be reloaded.')
+                self.show_warning('Praat save needs attention',
+                    f'Praat reported that it saved the TextGrid, but ANVUREL could not reload it: {error}\n\nPraat session script: {script}{backup}')
+            return
+        if changed:
+            try:
+                self.reload_impl()
+                self.status.set('Praat closed without a save confirmation. The changed TextGrid was reloaded; check it before continuing.')
+            except Exception as error:
+                self.status.set('Praat closed without a save confirmation and the changed TextGrid needs attention.')
+                self.show_warning('Praat save needs attention',
+                    f'Praat closed without confirming the save. The TextGrid changed but ANVUREL could not reload it: {error}\n\nPraat session script: {script}{backup}')
+                return
+        else:
+            self.status.set('Praat closed without Finish and save. Existing labels were kept; Praat edits may not have been saved.')
+        self.show_warning('Praat closed without Finish and save',
+            f'Praat closed without confirming a save. {"A changed TextGrid was reloaded; check it now." if changed else "The TextGrid did not change, so Praat edits may have been lost."}\n\nPraat session script: {script}{backup}')
+
     def watch(self):
         try:
-            if self.run:
-                ended=self.praat_process is not None and self.praat_process.poll() is not None
-                if ended:self.praat_process=None
+            if self.praat_process is not None and self.praat_process.poll() is not None:
+                self.handle_praat_exit()
+            elif self.run:
                 stat=(self.run/'annotations.TextGrid').stat();stamp=(stat.st_mtime_ns,stat.st_size)
-                if ended or self.autoreload.get() and stamp!=self.file_stamp:
+                if self.autoreload.get() and stamp!=self.file_stamp:
                     if self.dirty:self.status.set('TextGrid changed externally. Unsaved form retained; Reload discards that form.')
                     else:
                         try:self.reload_impl()
@@ -465,7 +578,7 @@ class Application(GuidedReviewMixin,TranscriptUIMixin,ComparisonUIMixin):
         def action():
             self.require_editable()
             if self.dirty:raise ValueError('Save or reload form edits before export.')
-            dest=core.export(self.run);self.status.set('Export complete: '+str(dest));messagebox.showinfo('Export complete',str(dest))
+            dest=core.export(self.run);self.status.set('Export complete: '+str(dest));self.show_info('Export complete',str(dest))
         self.guard(action)
 
     def folder(self):self.guard(lambda:(self.require_run(),os.startfile(self.run)))

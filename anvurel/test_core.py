@@ -41,7 +41,15 @@ class PipelineTests(unittest.TestCase):
             coverage=list(csv.DictReader(f))
         self.assertEqual(sum(x['target_16']=='True' for x in coverage),16)
         self.assertEqual(sum(int(x['count']) for x in coverage),1)
-        self.assertTrue((dest/'excerpt.wav').exists())
+        for private_file in ('excerpt.wav','reviewed.TextGrid','run.json','reviews.json','suggestions.json','transcript.json'):
+            self.assertFalse((dest/private_file).exists(),private_file)
+        self.assertEqual(len(list(dest.rglob('*.wav'))),1)
+        with (dest/'manifest.csv').open(encoding='utf-8-sig') as f:
+            manifest_text=f.read()
+        self.assertNotIn(str(self.source),manifest_text)
+        self.assertNotIn('source,',manifest_text)
+        with (dest/'quality.csv').open(encoding='utf-8-sig') as f:
+            self.assertEqual(len(list(csv.DictReader(f))),1)
     def test_changed_label_or_boundary_invalidates_approval(self):
         rows=self.label();core.approve(self.run,1,'rater')
         rows[1]['valence']='-1';core.write_grid(self.run/'annotations.TextGrid',2,rows)

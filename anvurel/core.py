@@ -293,7 +293,7 @@ def _write_export(run, dest, meta, rows, reviews, selected):
         clip = folder / f'interval_{i+1:05d}.wav'
         a, b = copy_audio(run / 'excerpt.wav', clip, row['start'], row['end'])
         review = reviews[signature(row)]
-        manifest.append(dict(sample_id=clip.stem, run_id=run.name, source=meta['source'], group=meta['group'],
+        manifest.append(dict(sample_id=clip.stem, group=meta['group'],
             source_start=meta['source_offset'] + a, source_end=meta['source_offset'] + b,
             excerpt_start=a, excerpt_end=b, speaker_speech=speaker, valence=valence, arousal=arousal,
             reviewer=review['reviewer'], approved_utc=review['approved_utc'], clip_path=str(clip.relative_to(dest))))
@@ -306,15 +306,12 @@ def _write_export(run, dest, meta, rows, reviews, selected):
     for measurement, (i, _) in zip(measured, selected):
         measurement['interval'] = i + 1
     write_csv(dest / 'acoustics.csv', measured, ['interval','start','end','duration','rms_dbfs','f0_mean_hz','f0_range_hz','voiced_fraction','measurement_note'])
-    shutil.copy2(run / 'annotations.TextGrid', dest / 'reviewed.TextGrid')
-    shutil.copy2(run / 'excerpt.wav', dest / 'excerpt.wav')
-    shutil.copy2(run / 'run.json', dest / 'run.json')
-    shutil.copy2(run / 'reviews.json', dest / 'reviews.json')
-    if (run / 'suggestions.json').exists():
-        shutil.copy2(run / 'suggestions.json', dest / 'suggestions.json')
     import automation
     quality = automation.quality_metrics(run / 'excerpt.wav', rows)
-    write_csv(dest / 'quality.csv', [dict(q,flags='; '.join(q['flags'])) for q in quality],
+    quality_by_interval = {item['interval']: item for item in quality}
+    selected_quality = [dict(quality_by_interval[i + 1], flags='; '.join(quality_by_interval[i + 1]['flags']))
+                        for i, _ in selected]
+    write_csv(dest / 'quality.csv', selected_quality,
               ['interval','start','end','near_full_scale_fraction','rms_dbfs','flags'])
 
 def log_event(run, action, **fields):
@@ -343,6 +340,17 @@ def save_annotations(run, rows, expected_hash=None, action='labels_saved'):
         log_event(run, action)
     finally:
         candidate.unlink(missing_ok=True)
+
+def backup_annotations(run):
+    """Keep a recoverable TextGrid copy before edits in the external Praat editor."""
+    run=Path(run).resolve()
+    source=run/'annotations.TextGrid'
+    if not source.is_file():raise ValueError('The current TextGrid is missing.')
+    history=run/'history';history.mkdir(exist_ok=True)
+    destination=history/(datetime.now().strftime('%Y%m%d_%H%M%S_')+
+                         uuid.uuid4().hex[:8]+'_before_praat.TextGrid')
+    shutil.copy2(source,destination)
+    return destination
 
 def set_boundaries(run, index, start, end, expected_hash=None, labels=None):
     meta,rows,_ = load_run(run)
@@ -383,7 +391,8 @@ def synchronize_tiers(run, expected_hash=None):
     save_annotations(run,rows,expected_hash,action='tiers_synchronized')
     return rows
 
-def review_script(run, start=0., end=None, *, close=False):
+def review_script(run, start=0., end=None, *, close=False,
+                  completion_path=None, completion_token=None):
     """Use an isolated Praat GUI with uniquely named objects, never menu clicks."""
     run=Path(run).resolve()
     meta,rows,_=load_run(run)
@@ -391,9 +400,12 @@ def review_script(run, start=0., end=None, *, close=False):
     def q(value):
         return '"'+str(value).replace('"','""')+'"'
     if close:
+        if not completion_path or not completion_token:
+            raise ValueError('A save confirmation file is required to finish Praat safely.')
         text=[f'selectObject: {q("TextGrid "+name)}',f'Save as text file: {q(run/"annotations.TextGrid")}',
-              'Remove',f'selectObject: {q("Sound "+name)}','Remove','Quit']
-        path=run/'finish_review.praat'
+              'Remove',f'selectObject: {q("Sound "+name)}','Remove',
+              f'writeFileLine: {q(completion_path)}, {q(completion_token)}','Quit']
+        path=run/('finish_review_'+uuid.uuid4().hex[:8]+'.praat')
     else:
         start=max(0.,min(float(start),meta['duration']))
         end=min(meta['duration'],float(end) if end is not None else min(start+10,meta['duration']))

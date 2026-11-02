@@ -22,7 +22,7 @@ if not defined ISCC goto missing_inno
 if not exist installer\output mkdir installer\output
 "%ISCC%" installer\ANVUREL.iss
 if errorlevel 1 goto failed
-echo Installer created at installer\output\ANVUREL-Setup-2.4.0.exe
+echo Installer created at installer\output\ANVUREL-Setup-2.4.1.exe
 pause
 exit /b 0
 

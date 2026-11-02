@@ -1,5 +1,13 @@
 # Change history
 
+## Version 2.4.1
+
+Approved exports now contain only approved clips and derived records for those clips. Partial transcript cues keep their timing map but omit text that may refer to unapproved audio. Exported manifests contain no source file paths.
+
+Reviewer IDs clear when a different run is opened or prepared. The output folder and Praat executable are saved in a small per-user settings file; reviewer IDs are never stored there.
+
+Praat now writes a completion marker only after its TextGrid save succeeds. ANVUREL backs up the TextGrid before opening Praat, reloads confirmed saves, and warns if Praat closes without confirmation. Error dialogs are raised in front of the application.
+
 ## Version 2.4.0
 
 The complete pilot workflow connects preparation, guided review, timed transcripts, reviewer comparison, and approved export. Exports include draft transcript snapshots and clip mappings at audio sample boundaries. A final input checksum check and temporary output folder prevent incomplete exports from appearing as completed work.

@@ -17,9 +17,10 @@ FIELDS = ('sample_id', 'interval', 'segment', 'excerpt_start', 'excerpt_end',
 def prepare_export(run, selected):
     """Validate inputs and prepare a detached snapshot before export files exist.
 
-    Each CSV row describes the overlap of one transcript cue and one approved
-    clip. Text remains the complete cue. A partial cue flag makes clear that
-    the text is not a word alignment for that shorter clip.
+    Each CSV row describes how a transcript cue overlaps an approved clip.
+    Text is included only when the complete cue falls inside the clip. For a
+    partial cue, times are retained for review but text is blank so the export
+    cannot disclose words from outside the approved audio.
     """
     run = Path(run)
     metadata, annotations, approvals = core.load_run(run)
@@ -31,7 +32,7 @@ def prepare_export(run, selected):
             or abs(document['duration'] - metadata['duration']) > 1e-6):
         raise ValueError('Transcript and annotations refer to different audio or excerpt times.')
     try:
-        snapshot = json.loads(json.dumps(document, ensure_ascii=False, allow_nan=False))
+        json.dumps(document, ensure_ascii=False, allow_nan=False)
     except (TypeError, ValueError) as error:
         raise ValueError('Transcript metadata cannot be exported as valid JSON.') from error
     records = []
@@ -48,7 +49,7 @@ def prepare_export(run, selected):
         if last_frame <= first_frame:
             raise ValueError('An approved interval is shorter than one audio sample and cannot be exported.')
         clip_start, clip_end = first_frame / rate, last_frame / rate
-        for segment_index, segment in enumerate(snapshot['segments'], 1):
+        for segment_index, segment in enumerate(document['segments'], 1):
             start = max(clip_start, segment['start'])
             end = min(clip_end, segment['end'])
             if end <= start:
@@ -61,27 +62,21 @@ def prepare_export(run, selected):
                 source_start=metadata['source_offset'] + start,
                 source_end=metadata['source_offset'] + end,
                 clip_start=start-clip_start, clip_end=end-clip_start,
-                text=segment['text'], partial_cue=partial, draft=True))
-    return {'document': snapshot, 'rows': records}
+                text='' if partial else segment['text'], partial_cue=partial, draft=True))
+    return {'rows': records}
 
 
 def write_export(bundle, destination):
-    """Write the prepared transcript snapshot and CSV into an export folder."""
+    """Write only transcript mappings for approved clips into an export folder."""
     if bundle is None:
         return
     destination = Path(destination)
-    json_path = destination / 'transcript.json'
     csv_path = destination / 'transcript_segments.csv'
-    if json_path.exists() or csv_path.exists():
+    if csv_path.exists():
         raise FileExistsError('Transcript export files already exist in the destination.')
-    # Serialize both files before writing either one. The caller can then
-    # publish the completed export directory as one operation.
-    document = json.dumps(bundle['document'], indent=2, ensure_ascii=False, allow_nan=False) + '\n'
     text = io.StringIO(newline='')
     writer = csv.DictWriter(text, fieldnames=FIELDS, extrasaction='raise')
     writer.writeheader()
     writer.writerows(bundle['rows'])
-    with json_path.open('xb') as stream:
-        stream.write(document.encode('utf-8'))
     with csv_path.open('xb') as stream:
         stream.write(text.getvalue().encode('utf-8-sig'))

@@ -2,7 +2,7 @@
 
 Assisted Naturalistic Vocal Utterance Review and Emotion Labeling
 
-Version 2.4.0
+Version 2.4.1
 
 ANVUREL is a Windows desktop application for annotating adult speech in LENA recordings. It prepares audio excerpts, imports adult segments from ITS metadata, and creates a Praat TextGrid. A researcher checks the boundaries and labels before exporting clips.
 
@@ -12,9 +12,9 @@ The screenshots below show generated tones and artificial ITS metadata. Their la
 
 ## Installation
 
-For the team installer, open the repository's **Actions** page, choose **Build ANVUREL installer**, and download the `ANVUREL-Windows-Installer` artifact from a successful run. Extract the artifact and run `ANVUREL-Setup-2.4.0.exe`. It creates a Start menu shortcut and offers an optional desktop shortcut. Python does not need to be installed separately.
+For team use, get `ANVUREL-Setup-2.4.1.exe` from the project maintainer through the storage location approved by your institution. GitHub Actions artifacts are temporary build files and require GitHub access, so they are for maintainers rather than the medical team. Extract the installer ZIP and run the EXE. The package includes a `.sha256` checksum file; maintainers can compare it with PowerShell's `Get-FileHash -Algorithm SHA256` result before sharing. ANVUREL creates a Start menu shortcut and offers an optional desktop shortcut. Python does not need to be installed separately.
 
-The installer stores work locally under `%LOCALAPPDATA%\ANVUREL`. It does not include recordings, transcripts, or annotation results. It includes the local speech component. The selected speech model is downloaded only after a reviewer opts in. Praat is optional and must be installed separately for editor review. The installer is unsigned, so an institution may require IT approval before installation.
+The installer stores work locally under `%LOCALAPPDATA%\ANVUREL`. It does not include recordings, transcripts, or annotation results. It includes the local speech component. The selected speech model is downloaded only after a reviewer opts in. Praat is optional and must be installed separately for editor review. The installer is unsigned, so an institution may require IT approval before installation. ANVUREL saves the selected output folder and Praat path in its per-user settings file. It does not save the reviewer ID there.
 
 To run from source instead, download the [ANVUREL branch](https://github.com/MAHanafy/LENA-Analysis/archive/refs/heads/anvurel.zip), install Python 3.12 with Tcl/Tk, pip, and the Python launcher, then run `setup.cmd` followed by `start.cmd` from the `anvurel` folder. Setup needs internet access. Install [Praat for Windows](https://www.fon.hum.uva.nl/praat/download_win.html) separately if you need its editor.
 
@@ -59,7 +59,7 @@ If a source file changes, create a new batch. When a completed run is missing, i
 
 ![Guided review with synthetic audio, draft text, large label buttons, and approval controls](docs/images/guided.jpg)
 
-Prepared runs open in **Guided review**. This screen presents one candidate with large buttons for speaker, listener, valence, and arousal. **Review list** opens the detailed table when you need to inspect several intervals.
+Prepared runs open in **Guided review**. This screen presents one candidate with large buttons for speaker, listener, valence, and arousal. **Review list** opens the detailed table when you need to inspect several intervals. The reviewer ID clears when you prepare or open a different run. Enter it again before approving samples; this prevents a second reviewer on a shared computer from using the previous reviewer's ID by mistake.
 
 **Play interval** plays the selection. You can loop it or choose 0.85 or 0.75 playback speed; slower playback uses Praat duration manipulation to preserve pitch. **Play context** includes one second before and after the selection. Press Escape or click **Stop** to stop playback.
 
@@ -111,9 +111,9 @@ Praat opens with the selected interval and the three annotation tiers. The examp
 1. Save your work in any other Praat instance and close that instance before starting a review from ANVUREL.
 2. Select a candidate and click **Open selection in Praat**, or press **F6**.
 3. Correct the boundaries and labels in the editor. ANVUREL pauses its own editing, approval, and export controls while that session is open. Its Previous and Next controls can still navigate the Praat editor.
-4. Return to ANVUREL and click **Finish and save Praat**. This saves the TextGrid, closes the dedicated session, and reloads the annotations.
+4. Return to ANVUREL and click **Finish and save Praat**. This saves the TextGrid, confirms the save, closes the dedicated session, and reloads the annotations.
 
-You may also save and close Praat manually. Save the Praat session before closing ANVUREL. **Auto reload saved TextGrid** detects external saves. If the tier boundaries differ, **Align to speaker tier** rebuilds the valence and arousal intervals from the speaker tier. It retains unambiguous labels, replaces conflicting labels with `?`, and keeps a backup.
+Use **Finish and save Praat** to end an ANVUREL session. ANVUREL keeps a TextGrid recovery copy in the run's `history` folder before opening Praat. If Praat closes by its own window controls, ANVUREL warns that edits may not have been saved and shows the Praat script and recovery file names. When the TextGrid changed, it reloads the file and asks you to check it. **Auto reload saved TextGrid** detects other external saves. If the tier boundaries differ, **Align to speaker tier** rebuilds the valence and arousal intervals from the speaker tier. It retains unambiguous labels, replaces conflicting labels with `?`, and keeps a backup.
 
 In Praat, Shift plus drag moves boundaries that share a time across tiers. The application communicates with Praat through scripts and `--send` commands. This requires a Windows desktop session that permits communication between processes. Automated navigation and saving require a single Praat instance.
 
@@ -184,11 +184,11 @@ By default, runs are saved under `outputs/anvurel/automation_runs` in the reposi
 | `reviews.json` | Explicit approvals and reviewer IDs |
 | `activity.jsonl` | Preparation and review events |
 
-Click **Export approved** after reviewing the intervals you want to use. Each export is written to a new folder. It contains the approved clips, reviewed TextGrid and excerpt, timestamps on the original and excerpt timelines, review and suggestion records, and coverage counts. Acoustic measurements use the approved boundaries. Quality flags are recalculated from the current TextGrid.
+Click **Export approved** after reviewing the intervals you want to use. Each export is written to a new folder. It contains only approved clips, their labels and approval records, coverage counts, and measurements for those clips. It does not copy the full excerpt, draft TextGrid, suggestions, all interval quality flags, transcript source file, or original recording paths. The source WAV and ITS files are left unchanged.
 
 Coverage includes 16 combinations of speaker class, speech type, positive or negative valence, and arousal. Eight further combinations use neutral valence. Categories with no approved clips have a count of zero. The source WAV and ITS files are left unchanged.
 
-When a valid transcript is attached, the export includes its excerpt snapshot in `transcript.json` and clip mappings in `transcript_segments.csv`. Mappings contain excerpt, original recording, and clip times at the actual audio sample boundaries. Full cue text is retained; `partial_cue` identifies text whose complete cue does not fit inside that clip. A cue crossing several clips does not establish which words belong to each one.
+When a transcript is attached, `transcript_segments.csv` maps cues to approved clips. Text is included only when the complete cue falls inside one approved clip. For partial cues, the time mapping remains but the text field is blank, because the cue may contain words from audio outside the approved clip.
 
 Exports are prepared in a temporary folder. The final export appears after all files are written and the input checksums still match. A failed write or changed input removes the incomplete output and leaves the reviewed source files in place.
 
@@ -198,7 +198,7 @@ The automated checks cover draft recovery, approval undo, playback speed and pit
 
 ## Working with a team
 
-Each researcher can install ANVUREL on their own Windows computer, or use an installation on a shared computer. Keep source recordings in an agreed location and use separate run folders for independent raters.
+Each researcher can install ANVUREL on their own Windows computer, or use an installation on a shared computer. Keep source recordings in an agreed location and use separate run folders for independent raters. Choose an output folder covered by your institution's backup and data handling rules. The default local app data folder may not be backed up. The output folder and Praat path persist between app sessions for the current Windows user. Reviewer IDs do not persist across restarts or run changes.
 
 Use one active reviewer per run folder. A queue lock allows one preparation worker per batch, but the application has no shared account system or simultaneous annotation service. Reviewed folders and exports can be shared through your team's approved storage.
 

@@ -20,7 +20,7 @@ class GuidedDesktopTests(Fixture):
         self.callbacks = []
         self.sound_patch = patch('winsound.PlaySound')
         self.sound = self.sound_patch.start()
-        self.error_patch = patch.object(app.messagebox, 'showerror', side_effect=lambda title, message: self.messages.append(str(message)))
+        self.error_patch = patch.object(app.messagebox, 'showerror', side_effect=lambda title, message, **kwargs: self.messages.append(str(message)))
         self.error_patch.start()
         self.open_application()
 

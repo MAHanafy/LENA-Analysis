@@ -16,7 +16,7 @@ class GuidedLayoutTests(Fixture):
         self.sound_patch = patch('winsound.PlaySound')
         self.sound_patch.start()
         self.messages = []
-        self.error_patch = patch.object(app.messagebox, 'showerror', side_effect=lambda title, message:self.messages.append(str(message)))
+        self.error_patch = patch.object(app.messagebox, 'showerror', side_effect=lambda title, message, **kwargs:self.messages.append(str(message)))
         self.error_patch.start()
         self.root_window = tk.Tk()
         self.root_window.withdraw()
@@ -165,3 +165,27 @@ class GuidedLayoutTests(Fixture):
         self.assertEqual(core.load_run(self.run)[2], {})
         self.assertEqual(self.callbacks, [])
         self.assertEqual(self.messages, [])
+
+    def test_loading_another_run_clears_reviewer_and_selects_first_candidate(self):
+        a = self.application
+        a.vars['reviewer'].set('reviewer_one')
+        another = self.make_run()
+        a.tree.selection_set(a.tree.get_children()[-1])
+        a.load_run(another)
+        self.root_window.update()
+        self.assertEqual(a.vars['reviewer'].get(), '')
+        self.assertEqual(a.selected_index(), int(a.tree.get_children()[0]))
+        self.assertEqual(self.messages, [])
+
+    def test_settings_store_output_and_praat_without_reviewer_identity(self):
+        a = self.application
+        settings_dir = self.root / 'user_settings'
+        a.vars['output'].set(str(self.root / 'shared_output'))
+        a.vars['praat'].set(str(self.root / 'Praat.exe'))
+        a.vars['reviewer'].set('reviewer_one')
+        with patch.object(app, 'SETTINGS_PATH', settings_dir / 'settings.json'):
+            a.save_settings()
+            stored = json.loads((settings_dir / 'settings.json').read_text(encoding='utf-8'))
+            self.assertEqual(stored, {'output': str(self.root / 'shared_output'),
+                                      'praat': str(self.root / 'Praat.exe')})
+            self.assertEqual(app.load_settings(), stored)

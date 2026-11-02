@@ -123,6 +123,18 @@ class ReviewTests(Fixture):
         run=self.labeled_run();text=core.review_script(run,.5,2).read_text()
         self.assertIn('View & Edit',text);self.assertIn('Select: 0.500000000000, 2.000000000000',text)
         self.assertIn('ANVUREL_',text)
+    def test_praat_finish_script_confirms_after_saving_textgrid(self):
+        run=self.labeled_run();marker=run/'.anvurel-finish-test.done';token='finish-token'
+        script=core.review_script(run,close=True,completion_path=marker,completion_token=token)
+        text=script.read_text()
+        self.assertLess(text.index('Save as text file:'),text.index('writeFileLine:'))
+        self.assertIn('writeFileLine:',text);self.assertIn(token,text)
+    def test_praat_session_starts_with_recovery_copy(self):
+        run=self.labeled_run();source=run/'annotations.TextGrid';before=source.read_bytes()
+        backup=core.backup_annotations(run)
+        self.assertTrue(backup.name.endswith('_before_praat.TextGrid'))
+        self.assertEqual(backup.read_bytes(),before)
+        self.assertEqual(source.read_bytes(),before)
     def test_existing_praat_session_is_not_taken_over(self):
         run=self.labeled_run()
         with patch.object(core,'running_praat_pids',return_value=[1234]),patch.object(core.subprocess,'Popen') as launch:

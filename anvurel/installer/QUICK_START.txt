@@ -6,19 +6,29 @@ ANVUREL QUICK START
 3. Check the group and excerpt length, then choose Prepare draft.
 4. Open Review samples, listen to the intervals, correct the labels, and save.
    Emotion labels remain the reviewer's decision.
-5. Approve reviewed samples and use Export approved samples when finished.
-6. The Transcript tab can import timed text or create a local draft. Creating a
+5. Enter your reviewer ID before approval. ANVUREL clears it when you open a
+   different run or restart the app.
+6. Approve reviewed samples and use Export approved samples when finished.
+7. The Transcript tab can import timed text or create a local draft. Creating a
    draft downloads a speech model only after you select Allow model download.
    Check the words and timing by listening before using the transcript.
 
-Work is stored on this computer in:
+The default work folder is:
 %LOCALAPPDATA%\ANVUREL\automation_runs
 
 Recordings and annotation results are not sent to ANVUREL or included in the
-installer. Choose an output folder appropriate for your study's data rules.
+installer. The default folder may not be backed up. Choose an output folder
+approved by your institution and covered by its backup rules. ANVUREL remembers
+the output folder for your Windows account.
+
+An export contains only approved clips and records for those clips. It leaves
+out the full excerpt, draft labels, transcript text outside approved clips,
+and original file paths.
 
 Praat review is optional. Install Praat separately from its official Windows
 download page, then use Browse beside Praat executable to select Praat.exe.
+Return to ANVUREL and choose Finish and save Praat. If Praat closes another way,
+ANVUREL warns you and shows the recovery file location.
 
 The application and speech component run locally. The speech model is stored
 under %LOCALAPPDATA%\ANVUREL\models after you allow its download.

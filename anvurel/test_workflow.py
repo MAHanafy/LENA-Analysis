@@ -24,7 +24,7 @@ class WorkflowTests(Fixture):
         self.errors = []
         self.callback_errors = []
         self.sound = patch('winsound.PlaySound').start()
-        self.error_dialog = patch('app.messagebox.showerror', side_effect=lambda title, text: self.errors.append(text)).start()
+        self.error_dialog = patch('app.messagebox.showerror', side_effect=lambda title, text, **kwargs: self.errors.append(text)).start()
         self.info_dialog = patch('app.messagebox.showinfo').start()
         self.addCleanup(patch.stopall)
         self.tk = tk.Tk(); self.tk.withdraw()
@@ -34,7 +34,7 @@ class WorkflowTests(Fixture):
             self.application.browse('source', 'file')
         self.assertEqual(Path(self.application.vars['its'].get()), self.source.with_suffix('.its'))
         for key, value in {'output': str(self.root / 'prepared'), 'offset': '.5',
-                           'length': '4', 'reviewer': 'rater_a'}.items():
+                           'length': '4'}.items():
             self.application.vars[key].set(value)
         self.application.refine.set(False)
         self.application.prepare()
@@ -43,6 +43,7 @@ class WorkflowTests(Fixture):
         self.assertEqual(self.callback_errors, [])
         self.assertIsNotNone(self.application.run)
         self.run = self.application.run
+        self.application.vars['reviewer'].set('rater_a')
 
     def tearDown(self):
         a = self.application
@@ -180,13 +181,14 @@ class WorkflowTests(Fixture):
         source_data, _, _ = self.audio_bytes(self.source, .8, 2.)
         self.assertEqual(clip_data, source_data)
         self.assertEqual(clip_frames, round(1.2 * rate))
-        self.assertEqual(json.loads((destination / 'transcript.json').read_text(encoding='utf-8')), transcripts.load(self.run))
+        self.assertFalse((destination / 'transcript.json').exists())
         with (destination / 'transcript_segments.csv').open(encoding='utf-8-sig', newline='') as handle:
             links = list(csv.DictReader(handle))
         self.assertEqual(len(links), 3)
         self.assertEqual([link['partial_cue'] for link in links], ['True', 'False', 'True'])
         self.assertEqual([link['segment'] for link in links], ['1', '2', '3'])
         self.assertTrue(all(link['sample_id'] == sample['sample_id'] for link in links))
+        self.assertEqual([link['text'] for link in links], ['', 'Middle phrase', ''])
         for link in links:
             self.assertEqual(link['draft'], 'True')
             self.assertAlmostEqual(float(link['source_start']), .5 + float(link['excerpt_start']))

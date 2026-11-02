@@ -31,6 +31,8 @@ class DesktopTests(Fixture):
         self.tk.update()
         _,rows,reviews=core.load_run(self.run)
         self.assertEqual(len(reviews),1)
+        self.assertEqual(a.vars['filter'].get(),'All')
+        a.vars['filter'].set('Needs review');a.render()
         self.assertEqual(len(a.tree.get_children()),1)
         self.assertFalse(a.dirty);self.assertEqual(self.errors,[])
     def test_external_change_does_not_discard_form(self):
@@ -59,5 +61,38 @@ class DesktopTests(Fixture):
         row=core.load_run(self.run)[1][idx]
         self.assertEqual(row['speaker_speech'],'FAN-CDS');self.assertEqual(row['valence'],'+1')
         self.assertFalse(a.dirty)
+
+    def test_praat_exit_without_finish_warns_and_keeps_loaded_labels(self):
+        a=self.application
+        baseline=core.digest(self.run/'annotations.TextGrid')
+        class Ended:
+            def poll(self):return 0
+        a.praat_process=Ended();a.praat_baseline=baseline;a.praat_script_name='open_review.praat'
+        with patch.object(a,'show_warning') as warning:
+            a.handle_praat_exit()
+        warning.assert_called_once()
+        self.assertIn('may have been lost',warning.call_args.args[1])
+        self.assertEqual(core.digest(self.run/'annotations.TextGrid'),baseline)
+        self.assertIsNone(a.praat_process)
+
+    def test_praat_completion_marker_reloads_saved_textgrid_without_warning(self):
+        a=self.application
+        baseline=core.digest(self.run/'annotations.TextGrid')
+        marker=self.run/'.anvurel-finish-test.done';token='confirmed'
+        marker.write_text(token,encoding='utf-8')
+        class Ended:
+            def poll(self):return 0
+        a.praat_process=Ended();a.praat_baseline=baseline
+        a.praat_completion=(marker,token);a.praat_script_name='finish_review_test.praat'
+        with patch.object(a,'show_warning') as warning:
+            a.handle_praat_exit()
+        warning.assert_not_called()
+        self.assertIn('saved and reloaded',a.status.get())
+        self.assertFalse(marker.exists())
+
+    def test_error_dialog_is_parented_to_the_raised_application_window(self):
+        with patch.object(app.messagebox,'showerror') as dialog:
+            self.application.show_error('Praat','Check the active session.')
+        self.assertEqual(dialog.call_args.kwargs['parent'],self.tk)
 
 if __name__=='__main__':unittest.main()

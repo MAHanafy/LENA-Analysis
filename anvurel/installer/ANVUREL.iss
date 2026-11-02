@@ -1,5 +1,5 @@
 #define AppName "ANVUREL Annotation Assistant"
-#define AppVersion "2.4.0"
+#define AppVersion "2.4.1"
 #define AppExe "ANVUREL.exe"
 
 [Setup]
